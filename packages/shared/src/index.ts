@@ -1,0 +1,41 @@
+export type Id = string;
+
+export type UserProfile = {
+  id: Id;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+};
+
+export type Board = {
+  id: Id;
+  title: string;
+  backgroundColor?: string;
+  memberIds: Id[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type List = {
+  id: Id;
+  boardId: Id;
+  title: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Card = {
+  id: Id;
+  listId: Id;
+  title: string;
+  description?: string;
+  isDone: boolean;
+  dueDate?: string;
+  labelIds?: Id[];
+  memberIds?: Id[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+
