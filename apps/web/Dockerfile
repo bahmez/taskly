@@ -8,6 +8,7 @@ WORKDIR /app
 FROM base AS pruner
 COPY . .
 RUN pnpm dlx turbo prune --scope=@taskly/web --docker
+RUN cp -f tsconfig.base.json /app/out/full/tsconfig.base.json
 
 FROM base AS builder
 COPY --from=pruner /app/out/json/ .
