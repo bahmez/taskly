@@ -7,7 +7,7 @@ import { AppModule } from './app.module.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '@taskly/trpc';
 import { FIREBASE_AUTH } from '@taskly/firebase';
-import { UsersService } from '@taskly/database';
+import { UsersService, WorkspacesService } from '@taskly/database';
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -36,6 +36,7 @@ async function bootstrap() {
     verifyIdToken: (token: string) => Promise<{ uid: string } & Record<string, unknown>>;
   };
   const usersService = app.get(UsersService);
+  const workspacesService = app.get(WorkspacesService);
 
   // tRPC endpoint (after Nest is created, so we can reuse its providers)
   server.use(
@@ -52,16 +53,43 @@ async function bootstrap() {
           deleteMe: usersService.deleteMe.bind(usersService),
         };
 
+        const workspaces = {
+          createWorkspace: workspacesService.createWorkspace.bind(workspacesService),
+          getWorkspaceById: workspacesService.getWorkspaceById.bind(workspacesService),
+          updateWorkspace: workspacesService.updateWorkspace.bind(workspacesService),
+          archiveWorkspace: workspacesService.archiveWorkspace.bind(workspacesService),
+          listWorkspacesForUser: workspacesService.listWorkspacesForUser.bind(workspacesService),
+
+          getMember: workspacesService.getMember.bind(workspacesService),
+          upsertMember: workspacesService.upsertMember.bind(workspacesService),
+          removeMember: workspacesService.removeMember.bind(workspacesService),
+          listMembers: workspacesService.listMembers.bind(workspacesService),
+          countMembers: workspacesService.countMembers.bind(workspacesService),
+          countAdmins: workspacesService.countAdmins.bind(workspacesService),
+
+          listBoards: workspacesService.listBoards.bind(workspacesService),
+          createBoard: workspacesService.createBoard.bind(workspacesService),
+          archiveBoard: workspacesService.archiveBoard.bind(workspacesService),
+          reorderBoards: workspacesService.reorderBoards.bind(workspacesService),
+
+          createInvitation: workspacesService.createInvitation.bind(workspacesService),
+          listPendingInvitations: workspacesService.listPendingInvitations.bind(workspacesService),
+          getInvitation: workspacesService.getInvitation.bind(workspacesService),
+          cancelInvitation: workspacesService.cancelInvitation.bind(workspacesService),
+          acceptInvitationByToken: workspacesService.acceptInvitationByToken.bind(workspacesService),
+          declineInvitationByToken: workspacesService.declineInvitationByToken.bind(workspacesService),
+        };
+
         if (!token) {
-          return { user: null, users };
+          return { user: null, users, workspaces };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users };
+          return { user, users, workspaces };
         } catch {
-          return { user: null, users };
+          return { user: null, users, workspaces };
         }
       },
     }),
