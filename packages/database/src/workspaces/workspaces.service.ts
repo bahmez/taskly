@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type {
-  WorkspaceBoardModel,
   WorkspaceCreateInput,
   WorkspaceInvitationModel,
   WorkspaceMemberModel,
@@ -56,25 +55,6 @@ export class WorkspacesService {
 
   countAdmins(workspaceId: string): Promise<number> {
     return this.store.countAdmins(workspaceId);
-  }
-
-  listBoards(workspaceId: string): Promise<WorkspaceBoardModel[]> {
-    return this.store.listBoards(workspaceId);
-  }
-
-  createBoard(
-    workspaceId: string,
-    input: { title: string; backgroundColor?: string | null; memberIds?: string[] },
-  ): Promise<WorkspaceBoardModel> {
-    return this.store.createBoard(workspaceId, input);
-  }
-
-  archiveBoard(workspaceId: string, boardId: string): Promise<void> {
-    return this.store.archiveBoard(workspaceId, boardId);
-  }
-
-  reorderBoards(workspaceId: string, boardIds: string[]): Promise<void> {
-    return this.store.reorderBoards(workspaceId, boardIds);
   }
 
   createInvitation(
