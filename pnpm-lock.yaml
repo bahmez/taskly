@@ -53,6 +53,9 @@ importers:
       '@taskly/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
+      '@taskly/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@taskly/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc

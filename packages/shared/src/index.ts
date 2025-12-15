@@ -7,6 +7,23 @@ export type UserProfile = {
   photoURL?: string;
 };
 
+export type WorkspaceRole = 'admin' | 'maintainer' | 'editor' | 'viewer';
+
+export type Workspace = {
+  id: Id;
+  title: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspaceMember = {
+  userId: Id;
+  role: WorkspaceRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Board = {
   id: Id;
   title: string;
@@ -37,5 +54,7 @@ export type Card = {
   createdAt: string;
   updatedAt: string;
 };
+
+export * from './workspace-permissions';
 
 
