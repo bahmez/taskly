@@ -42,16 +42,4 @@ export type WorkspaceInvitationModel = {
   cancelledBy: string | null;
 };
 
-export type WorkspaceBoardModel = {
-  id: string;
-  title: string;
-  backgroundColor: string | null;
-  memberIds: string[];
-  order: number;
-  isArchived: boolean;
-  archivedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 

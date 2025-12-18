@@ -1,0 +1,213 @@
+{
+  "info": {
+    "name": "Taskly - Board",
+    "_postman_id": "2d3d4d86-3d28-4fbb-ae90-0b6f3b10b6f1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "PASTE_FIREBASE_ID_TOKEN_HERE" },
+    { "key": "workspaceId", "value": "PASTE_WORKSPACE_ID_HERE" },
+    { "key": "boardId", "value": "PASTE_BOARD_ID_HERE" },
+    { "key": "columnId", "value": "PASTE_COLUMN_ID_HERE" },
+    { "key": "ticketId", "value": "PASTE_TICKET_ID_HERE" }
+  ],
+  "item": [
+    {
+      "name": "Setup (optional)",
+      "item": [
+        {
+          "name": "Create board (via workspace route)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My Board\",\n  \"backgroundColor\": \"#0f172a\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workspaces/{{workspaceId}}/boards",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "workspaces", "{{workspaceId}}", "boards"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Board",
+      "item": [
+        {
+          "name": "Get board",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update board",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My Board (updated)\",\n  \"description\": \"Updated from Postman\",\n  \"background\": \"#1e293b\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Columns",
+      "item": [
+        {
+          "name": "List columns",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/columns",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "columns"]
+            }
+          }
+        },
+        {
+          "name": "Create column",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Backlog\",\n  \"key\": \"backlog\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/columns",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "columns"]
+            }
+          }
+        },
+        {
+          "name": "Update column",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Backlog (renamed)\",\n  \"key\": \"backlog\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/columns/{{columnId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "columns", "{{columnId}}"]
+            }
+          }
+        },
+        {
+          "name": "Reorder columns",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"columnIds\": [\"{{columnId}}\"]\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/columns/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "columns", "order"]
+            }
+          }
+        },
+        {
+          "name": "Delete column",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/columns/{{columnId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "columns", "{{columnId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets",
+      "item": [
+        {
+          "name": "List tickets (board)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "tickets"]
+            }
+          }
+        },
+        {
+          "name": "List tickets (column)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/columns/{{columnId}}/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "columns", "{{columnId}}", "tickets"]
+            }
+          }
+        },
+        {
+          "name": "Move ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"columnId\": \"{{columnId}}\",\n  \"position\": 1\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/tickets/{{ticketId}}/move",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "tickets", "{{ticketId}}", "move"]
+            }
+          }
+        },
+        {
+          "name": "Delete ticket",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/boards/{{boardId}}/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "boards", "{{boardId}}", "tickets", "{{ticketId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
+

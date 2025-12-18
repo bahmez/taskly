@@ -4,6 +4,7 @@ import { FirebaseModule } from '@taskly/firebase';
 import { DatabaseModule } from '@taskly/database';
 import { UserModule } from './user/user.module.js';
 import { WorkspaceModule } from './workspace/workspace.module.js';
+import { BoardModule } from './board/board.module.js';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { WorkspaceModule } from './workspace/workspace.module.js';
     DatabaseModule,
     UserModule,
     WorkspaceModule,
+    BoardModule,
   ],
   controllers: [AppController],
 })

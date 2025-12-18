@@ -7,7 +7,7 @@ import { AppModule } from './app.module.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '@taskly/trpc';
 import { FIREBASE_AUTH } from '@taskly/firebase';
-import { UsersService, WorkspacesService } from '@taskly/database';
+import { BoardsService, UsersService, WorkspacesService } from '@taskly/database';
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -37,6 +37,7 @@ async function bootstrap() {
   };
   const usersService = app.get(UsersService);
   const workspacesService = app.get(WorkspacesService);
+  const boardsService = app.get(BoardsService);
 
   // tRPC endpoint (after Nest is created, so we can reuse its providers)
   server.use(
@@ -67,11 +68,6 @@ async function bootstrap() {
           countMembers: workspacesService.countMembers.bind(workspacesService),
           countAdmins: workspacesService.countAdmins.bind(workspacesService),
 
-          listBoards: workspacesService.listBoards.bind(workspacesService),
-          createBoard: workspacesService.createBoard.bind(workspacesService),
-          archiveBoard: workspacesService.archiveBoard.bind(workspacesService),
-          reorderBoards: workspacesService.reorderBoards.bind(workspacesService),
-
           createInvitation: workspacesService.createInvitation.bind(workspacesService),
           listPendingInvitations: workspacesService.listPendingInvitations.bind(workspacesService),
           getInvitation: workspacesService.getInvitation.bind(workspacesService),
@@ -80,16 +76,37 @@ async function bootstrap() {
           declineInvitationByToken: workspacesService.declineInvitationByToken.bind(workspacesService),
         };
 
+        const boards = {
+          getBoardById: boardsService.getBoardById.bind(boardsService),
+          updateBoard: boardsService.updateBoard.bind(boardsService),
+          archiveBoard: boardsService.archiveBoard.bind(boardsService),
+
+          listBoardsForWorkspace: boardsService.listBoardsForWorkspace.bind(boardsService),
+          createBoard: boardsService.createBoard.bind(boardsService),
+          reorderBoards: boardsService.reorderBoards.bind(boardsService),
+
+          listColumns: boardsService.listColumns.bind(boardsService),
+          createColumn: boardsService.createColumn.bind(boardsService),
+          updateColumn: boardsService.updateColumn.bind(boardsService),
+          deleteColumn: boardsService.deleteColumn.bind(boardsService),
+          reorderColumns: boardsService.reorderColumns.bind(boardsService),
+
+          listTickets: boardsService.listTickets.bind(boardsService),
+          listTicketsByColumn: boardsService.listTicketsByColumn.bind(boardsService),
+          moveTicket: boardsService.moveTicket.bind(boardsService),
+          archiveTicket: boardsService.archiveTicket.bind(boardsService),
+        };
+
         if (!token) {
-          return { user: null, users, workspaces };
+          return { user: null, users, workspaces, boards };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces };
+          return { user, users, workspaces, boards };
         } catch {
-          return { user: null, users, workspaces };
+          return { user: null, users, workspaces, boards };
         }
       },
     }),

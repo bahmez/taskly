@@ -2,7 +2,6 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FIRESTORE } from '@taskly/firebase';
 import type {
-  WorkspaceBoardModel,
   WorkspaceCreateInput,
   WorkspaceInvitationModel,
   WorkspaceMemberModel,
@@ -13,7 +12,6 @@ import type {
 
 type WorkspaceDoc = Omit<WorkspaceModel, 'id'>;
 type MemberDoc = Omit<WorkspaceMemberModel, 'userId'> & { userId: string };
-type BoardDoc = Omit<WorkspaceBoardModel, 'id'>;
 type InvitationDoc = Omit<WorkspaceInvitationModel, 'id' | 'workspaceId'>;
 
 function nowIso(): string {
@@ -34,10 +32,6 @@ export class WorkspacesStore {
 
   private membersCol(workspaceId: string) {
     return this.workspaceRef(workspaceId).collection('members');
-  }
-
-  private boardsCol(workspaceId: string) {
-    return this.workspaceRef(workspaceId).collection('boards');
   }
 
   private invitationsCol(workspaceId: string) {
@@ -161,66 +155,6 @@ export class WorkspacesStore {
       workspaces.push({ id: snap.id, ...data });
     }
     return workspaces.filter((w) => !w.isArchived);
-  }
-
-  async listBoards(workspaceId: string): Promise<WorkspaceBoardModel[]> {
-    const snap = await this.boardsCol(workspaceId)
-      .where('isArchived', '==', false)
-      .orderBy('order', 'asc')
-      .get();
-    return snap.docs.map((d) => {
-      const data = d.data() as BoardDoc;
-      return { id: d.id, ...data };
-    });
-  }
-
-  async createBoard(
-    workspaceId: string,
-    input: { title: string; backgroundColor?: string | null; memberIds?: string[] },
-  ): Promise<WorkspaceBoardModel> {
-    const now = nowIso();
-    const existing = await this.boardsCol(workspaceId).orderBy('order', 'desc').limit(1).get();
-    const maxOrder = existing.empty ? -1 : ((existing.docs[0]!.data() as BoardDoc).order ?? 0);
-    const order = maxOrder + 1;
-
-    const ref = this.boardsCol(workspaceId).doc();
-    const doc: BoardDoc = {
-      title: input.title,
-      backgroundColor: input.backgroundColor ?? null,
-      memberIds: input.memberIds ?? [],
-      order,
-      isArchived: false,
-      archivedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await ref.create(doc);
-    return { id: ref.id, ...doc };
-  }
-
-  async archiveBoard(workspaceId: string, boardId: string): Promise<void> {
-    const now = nowIso();
-    await this.boardsCol(workspaceId).doc(boardId).update({
-      isArchived: true,
-      archivedAt: now,
-      updatedAt: now,
-    });
-  }
-
-  async reorderBoards(workspaceId: string, boardIds: string[]): Promise<void> {
-    const refs = boardIds.map((id) => this.boardsCol(workspaceId).doc(id));
-    await this.db.runTransaction(async (tx) => {
-      const snaps = await Promise.all(refs.map((r) => tx.get(r)));
-      for (const [idx, snap] of snaps.entries()) {
-        if (!snap.exists) {
-          throw new Error(`Board not found: ${boardIds[idx]}`);
-        }
-      }
-      const now = nowIso();
-      for (let i = 0; i < refs.length; i++) {
-        tx.update(refs[i]!, { order: i, updatedAt: now } satisfies Partial<BoardDoc>);
-      }
-    });
   }
 
   async createInvitation(

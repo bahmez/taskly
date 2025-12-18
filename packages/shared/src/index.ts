@@ -56,5 +56,6 @@ export type Card = {
 };
 
 export * from './workspace-permissions';
+export * from './board-ticket-permissions';
 
 

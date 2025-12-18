@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser, FirebaseAuthGuard } from '@taskly/auth';
 import type { UserModel, WorkspaceRole } from '@taskly/database';
-import { UsersService, WorkspacesService } from '@taskly/database';
+import { BoardsService, UsersService, WorkspacesService } from '@taskly/database';
 import { canAssignRole } from './permissions.js';
 import { WorkspaceAccessService } from './workspace-access.service.js';
 
@@ -49,6 +49,7 @@ function addDaysIso(days: number): string {
 export class WorkspaceController {
   constructor(
     private readonly workspaces: WorkspacesService,
+    private readonly boardsService: BoardsService,
     private readonly users: UsersService,
     private readonly access: WorkspaceAccessService,
   ) {}
@@ -86,7 +87,7 @@ export class WorkspaceController {
 
     const [membersCount, boards] = await Promise.all([
       this.workspaces.countMembers(workspaceId),
-      this.workspaces.listBoards(workspaceId),
+      this.boardsService.listBoardsForWorkspace(workspaceId),
     ]);
 
     return {
@@ -219,7 +220,7 @@ export class WorkspaceController {
   @Get('/:workspaceId/boards')
   async boards(@CurrentUser() user: UserModel, @Param('workspaceId') workspaceId: string) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.boards.read');
-    return await this.workspaces.listBoards(workspaceId);
+    return await this.boardsService.listBoardsForWorkspace(workspaceId);
   }
 
   @Post('/:workspaceId/boards')
@@ -232,7 +233,11 @@ export class WorkspaceController {
     const title = (body.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
     const backgroundColor = body.backgroundColor ?? null;
-    return await this.workspaces.createBoard(workspaceId, { title, backgroundColor });
+    return await this.boardsService.createBoard({
+      workspaceId,
+      title,
+      background: backgroundColor,
+    });
   }
 
   @Patch('/:workspaceId/boards/order')
@@ -250,7 +255,7 @@ export class WorkspaceController {
       throw new BadRequestException('boardIds must be unique');
     }
     try {
-      await this.workspaces.reorderBoards(workspaceId, boardIds);
+      await this.boardsService.reorderBoards(workspaceId, boardIds);
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
@@ -264,7 +269,8 @@ export class WorkspaceController {
     @Param('boardId') boardId: string,
   ) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.boards.write');
-    await this.workspaces.archiveBoard(workspaceId, boardId);
+    // will also stop appearing in /workspaces/:id/boards
+    await this.boardsService.archiveBoard(boardId);
     return { ok: true };
   }
 

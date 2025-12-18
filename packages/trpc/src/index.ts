@@ -48,12 +48,36 @@ export type WorkspaceMember = {
   updatedAt: string;
 };
 
-export type WorkspaceBoard = {
+export type Board = {
   id: string;
+  workspaceId: string;
   title: string;
-  backgroundColor: string | null;
-  memberIds: string[];
+  description: string;
+  background: string | null;
   order: number;
+  isArchived: boolean;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BoardColumn = {
+  id: string;
+  boardId: string;
+  title: string;
+  key: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Ticket = {
+  id: string;
+  boardId: string;
+  columnId: string;
+  title: string;
+  description: string;
+  position: number;
   isArchived: boolean;
   archivedAt: string | null;
   createdAt: string;
@@ -93,14 +117,6 @@ export type WorkspacesContext = {
   countMembers: (workspaceId: string) => Promise<number>;
   countAdmins: (workspaceId: string) => Promise<number>;
 
-  listBoards: (workspaceId: string) => Promise<WorkspaceBoard[]>;
-  createBoard: (
-    workspaceId: string,
-    input: { title: string; backgroundColor?: string | null; memberIds?: string[] },
-  ) => Promise<WorkspaceBoard>;
-  archiveBoard: (workspaceId: string, boardId: string) => Promise<void>;
-  reorderBoards: (workspaceId: string, boardIds: string[]) => Promise<void>;
-
   createInvitation: (
     workspaceId: string,
     input: { token: string; role: WorkspaceRole; createdBy: string; expiresAt: string },
@@ -112,10 +128,32 @@ export type WorkspacesContext = {
   declineInvitationByToken: (token: string, userId: string) => Promise<WorkspaceInvitation>;
 };
 
+export type BoardsContext = {
+  getBoardById: (boardId: string) => Promise<Board | null>;
+  updateBoard: (boardId: string, patch: { title?: string; description?: string; background?: string | null }) => Promise<Board>;
+  archiveBoard: (boardId: string) => Promise<void>;
+
+  listBoardsForWorkspace: (workspaceId: string) => Promise<Board[]>;
+  createBoard: (input: { workspaceId: string; title: string; description?: string; background?: string | null }) => Promise<Board>;
+  reorderBoards: (workspaceId: string, boardIds: string[]) => Promise<void>;
+
+  listColumns: (boardId: string) => Promise<BoardColumn[]>;
+  createColumn: (boardId: string, input: { title: string; key: string }) => Promise<BoardColumn>;
+  updateColumn: (boardId: string, columnId: string, patch: { title?: string; key?: string }) => Promise<BoardColumn>;
+  deleteColumn: (boardId: string, columnId: string) => Promise<void>;
+  reorderColumns: (boardId: string, columnIds: string[]) => Promise<void>;
+
+  listTickets: (boardId: string) => Promise<Ticket[]>;
+  listTicketsByColumn: (boardId: string, columnId: string) => Promise<Ticket[]>;
+  moveTicket: (boardId: string, ticketId: string, input: { columnId: string; position: number }) => Promise<void>;
+  archiveTicket: (boardId: string, ticketId: string) => Promise<void>;
+};
+
 export type Context = {
   user: User | null;
   users: UsersContext;
   workspaces: WorkspacesContext;
+  boards: BoardsContext;
 };
 
 const t = initTRPC.context<Context>().create({
@@ -243,7 +281,7 @@ export const appRouter = router({
 
         const [membersCount, boards] = await Promise.all([
           ctx.workspaces.countMembers(input.workspaceId),
-          ctx.workspaces.listBoards(input.workspaceId),
+          ctx.boards.listBoardsForWorkspace(input.workspaceId),
         ]);
 
         return { ...ws, stats: { membersCount, boardsCount: boards.length } };
@@ -358,7 +396,7 @@ export const appRouter = router({
         .input(z.object({ workspaceId: z.string().min(1) }))
         .query(async ({ ctx, input }) => {
           await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.boards.read');
-          return await ctx.workspaces.listBoards(input.workspaceId);
+          return await ctx.boards.listBoardsForWorkspace(input.workspaceId);
         }),
 
       create: protectedProcedure
@@ -371,9 +409,10 @@ export const appRouter = router({
         )
         .mutation(async ({ ctx, input }) => {
           await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.boards.write');
-          return await ctx.workspaces.createBoard(input.workspaceId, {
+          return await ctx.boards.createBoard({
+            workspaceId: input.workspaceId,
             title: input.title.trim(),
-            backgroundColor: input.backgroundColor ?? null,
+            background: input.backgroundColor ?? null,
           });
         }),
 
@@ -389,7 +428,7 @@ export const appRouter = router({
           if (new Set(input.boardIds).size !== input.boardIds.length) {
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'boardIds must be unique' });
           }
-          await ctx.workspaces.reorderBoards(input.workspaceId, input.boardIds);
+          await ctx.boards.reorderBoards(input.workspaceId, input.boardIds);
           return { ok: true };
         }),
 
@@ -397,7 +436,7 @@ export const appRouter = router({
         .input(z.object({ workspaceId: z.string().min(1), boardId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
           await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.boards.write');
-          await ctx.workspaces.archiveBoard(input.workspaceId, input.boardId);
+          await ctx.boards.archiveBoard(input.boardId);
           return { ok: true };
         }),
     }),
