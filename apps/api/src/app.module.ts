@@ -5,6 +5,7 @@ import { DatabaseModule } from '@taskly/database';
 import { UserModule } from './user/user.module.js';
 import { WorkspaceModule } from './workspace/workspace.module.js';
 import { BoardModule } from './board/board.module.js';
+import { TicketModule } from './ticket/ticket.module.js';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { BoardModule } from './board/board.module.js';
     UserModule,
     WorkspaceModule,
     BoardModule,
+    TicketModule,
   ],
   controllers: [AppController],
 })

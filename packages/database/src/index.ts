@@ -26,6 +26,8 @@ export type {
 export { BoardsStore } from './boards/boards.store';
 export { BoardsService } from './boards/boards.service';
 
-export type { TicketModel, TicketUpdateInput } from './tickets/ticket.model';
+export type { TicketModel, TicketUpdateInput, TicketCommentModel } from './tickets/ticket.model';
+export { TicketsStore } from './tickets/tickets.store';
+export { TicketsService } from './tickets/tickets.service';
 
 
