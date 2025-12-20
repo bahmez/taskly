@@ -7,7 +7,7 @@ import { AppModule } from './app.module.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '@taskly/trpc';
 import { FIREBASE_AUTH } from '@taskly/firebase';
-import { BoardsService, UsersService, WorkspacesService } from '@taskly/database';
+import { BoardsService, TicketsService, UsersService, WorkspacesService } from '@taskly/database';
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -38,6 +38,7 @@ async function bootstrap() {
   const usersService = app.get(UsersService);
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
+  const ticketsService = app.get(TicketsService);
 
   // tRPC endpoint (after Nest is created, so we can reuse its providers)
   server.use(
@@ -97,16 +98,31 @@ async function bootstrap() {
           archiveTicket: boardsService.archiveTicket.bind(boardsService),
         };
 
+        const tickets = {
+          getById: ticketsService.getById.bind(ticketsService),
+          update: ticketsService.update.bind(ticketsService),
+          archive: ticketsService.archive.bind(ticketsService),
+
+          listComments: ticketsService.listComments.bind(ticketsService),
+          addComment: ticketsService.addComment.bind(ticketsService),
+          updateComment: ticketsService.updateComment.bind(ticketsService),
+          deleteComment: ticketsService.deleteComment.bind(ticketsService),
+
+          getAssigneeIds: ticketsService.getAssigneeIds.bind(ticketsService),
+          addAssignee: ticketsService.addAssignee.bind(ticketsService),
+          removeAssignee: ticketsService.removeAssignee.bind(ticketsService),
+        };
+
         if (!token) {
-          return { user: null, users, workspaces, boards };
+          return { user: null, users, workspaces, boards, tickets };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards };
+          return { user, users, workspaces, boards, tickets };
         } catch {
-          return { user: null, users, workspaces, boards };
+          return { user: null, users, workspaces, boards, tickets };
         }
       },
     }),

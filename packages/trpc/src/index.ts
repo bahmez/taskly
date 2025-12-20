@@ -7,6 +7,7 @@ import type { WorkspaceRole } from '@taskly/shared';
 import {
   canAssignRole,
   hasPermission,
+  ticketRolePermissions,
   workspaceRolePermissions,
 } from '@taskly/shared';
 
@@ -77,9 +78,20 @@ export type Ticket = {
   columnId: string;
   title: string;
   description: string;
+  dueDate: string | null;
+  assigneeIds: string[];
   position: number;
   isArchived: boolean;
   archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketComment = {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  content: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -149,11 +161,27 @@ export type BoardsContext = {
   archiveTicket: (boardId: string, ticketId: string) => Promise<void>;
 };
 
+export type TicketsContext = {
+  getById: (ticketId: string) => Promise<Ticket | null>;
+  update: (ticketId: string, patch: { title?: string; description?: string; dueDate?: string | null }) => Promise<Ticket>;
+  archive: (ticketId: string) => Promise<void>;
+
+  listComments: (ticketId: string) => Promise<TicketComment[]>;
+  addComment: (ticketId: string, input: { authorId: string; content: string }) => Promise<TicketComment>;
+  updateComment: (ticketId: string, commentId: string, patch: { content: string }) => Promise<TicketComment>;
+  deleteComment: (ticketId: string, commentId: string) => Promise<void>;
+
+  getAssigneeIds: (ticketId: string) => Promise<string[]>;
+  addAssignee: (ticketId: string, userId: string) => Promise<void>;
+  removeAssignee: (ticketId: string, userId: string) => Promise<void>;
+};
+
 export type Context = {
   user: User | null;
   users: UsersContext;
   workspaces: WorkspacesContext;
   boards: BoardsContext;
+  tickets: TicketsContext;
 };
 
 const t = initTRPC.context<Context>().create({
@@ -206,6 +234,29 @@ async function requireWorkspacePermission(
   }
 
   return { workspace: ws, member, role };
+}
+
+async function requireTicketPermission(
+  ctx: Context,
+  ticketId: string,
+  required: string,
+): Promise<{ ticket: Ticket; role: WorkspaceRole; workspaceId: string }> {
+  const ticket = await ctx.tickets.getById(ticketId);
+  if (!ticket) throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
+
+  const board = await ctx.boards.getBoardById(ticket.boardId);
+  if (!board || board.isArchived) throw new TRPCError({ code: 'NOT_FOUND', message: 'Board not found' });
+  const workspaceId = board.workspaceId;
+
+  const member = await ctx.workspaces.getMember(workspaceId, ctx.user!.id);
+  if (!member) throw new TRPCError({ code: 'FORBIDDEN', message: 'Not a workspace member' });
+
+  const role = member.role;
+  const grants = ticketRolePermissions[role] ?? [];
+  if (!hasPermission(grants, required)) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Missing permission' });
+  }
+  return { ticket, role, workspaceId };
 }
 
 export const appRouter = router({
@@ -496,6 +547,103 @@ export const appRouter = router({
         .mutation(({ ctx, input }) =>
           ctx.workspaces.declineInvitationByToken(input.token, ctx.user!.id),
         ),
+    }),
+  }),
+  tickets: router({
+    get: protectedProcedure
+      .input(z.object({ ticketId: z.string().min(1) }))
+      .query(async ({ ctx, input }) => {
+        const { ticket, role } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+        const canAssignmentsRead = hasPermission(ticketRolePermissions[role] ?? [], 'ticket.assignments.read');
+        return {
+          ...ticket,
+          assigneeIds: canAssignmentsRead ? ticket.assigneeIds : undefined,
+        };
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          ticketId: z.string().min(1),
+          title: z.string().min(1).max(200).optional(),
+          description: z.string().optional(),
+          dueDate: z.string().nullable().optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+        const patch: { title?: string; description?: string; dueDate?: string | null } = {};
+        if (typeof input.title === 'string') patch.title = input.title.trim();
+        if (typeof input.description === 'string') patch.description = input.description;
+        if (input.dueDate === null || typeof input.dueDate === 'string') patch.dueDate = input.dueDate;
+        return await ctx.tickets.update(input.ticketId, patch);
+      }),
+
+    remove: protectedProcedure
+      .input(z.object({ ticketId: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+        await ctx.tickets.archive(input.ticketId);
+        return { ok: true };
+      }),
+
+    comments: router({
+      list: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1) }))
+        .query(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.read');
+          return await ctx.tickets.listComments(input.ticketId);
+        }),
+
+      add: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), content: z.string().min(1).max(10000) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          return await ctx.tickets.addComment(input.ticketId, { authorId: ctx.user!.id, content: input.content.trim() });
+        }),
+
+      update: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), commentId: z.string().min(1), content: z.string().min(1).max(10000) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          return await ctx.tickets.updateComment(input.ticketId, input.commentId, { content: input.content.trim() });
+        }),
+
+      remove: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), commentId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          await ctx.tickets.deleteComment(input.ticketId, input.commentId);
+          return { ok: true };
+        }),
+    }),
+
+    assignees: router({
+      list: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1) }))
+        .query(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.read');
+          const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
+          return { assigneeIds };
+        }),
+
+      add: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), userId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
+          const exists = await ctx.users.getById(input.userId);
+          if (!exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+          await ctx.tickets.addAssignee(input.ticketId, input.userId);
+          return { ok: true };
+        }),
+
+      remove: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), userId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
+          await ctx.tickets.removeAssignee(input.ticketId, input.userId);
+          return { ok: true };
+        }),
     }),
   }),
 });

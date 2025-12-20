@@ -1,0 +1,256 @@
+{
+  "info": {
+    "name": "Taskly - Ticket",
+    "_postman_id": "0b68b8b9-8c38-4b79-8b66-2c8d7a2b75cf",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "PASTE_FIREBASE_ID_TOKEN_HERE" },
+    { "key": "ticketId", "value": "PASTE_TICKET_ID_HERE" },
+    { "key": "commentId", "value": "PASTE_COMMENT_ID_HERE" },
+    { "key": "userId", "value": "PASTE_USER_ID_HERE" }
+  ],
+  "item": [
+    {
+      "name": "REST (/api/tickets)",
+      "item": [
+        {
+          "name": "Get ticket",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Ticket title (updated)\",\n  \"description\": \"# Markdown\\n\\nHello from Postman\",\n  \"dueDate\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete ticket",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}"]
+            }
+          }
+        },
+        {
+          "name": "List comments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "comments"]
+            }
+          }
+        },
+        {
+          "name": "Add comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"My comment\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "comments"]
+            }
+          }
+        },
+        {
+          "name": "Update comment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"My comment (edited)\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/comments/{{commentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "comments", "{{commentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete comment",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/comments/{{commentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "comments", "{{commentId}}"]
+            }
+          }
+        },
+        {
+          "name": "List assignees",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/assignees",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "assignees"]
+            }
+          }
+        },
+        {
+          "name": "Add assignee",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/assignees",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "assignees"]
+            }
+          }
+        },
+        {
+          "name": "Remove assignee",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/assignees/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}", "assignees", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC (/trpc) — httpBatchLink format",
+      "description": "Ces requêtes utilisent le format du httpBatchLink (v11). Elles envoient un batch de 1 appel.",
+      "item": [
+        {
+          "name": "tickets.get (query)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"0\": {\n    \"json\": {\n      \"ticketId\": \"{{ticketId}}\"\n    }\n  }\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/trpc/tickets.get?batch=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["trpc", "tickets.get"],
+              "query": [{ "key": "batch", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "tickets.update (mutation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"0\": {\n    \"json\": {\n      \"ticketId\": \"{{ticketId}}\",\n      \"title\": \"Ticket title (updated)\",\n      \"description\": \"# Markdown\\n\\nHello from Postman\",\n      \"dueDate\": null\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/trpc/tickets.update?batch=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["trpc", "tickets.update"],
+              "query": [{ "key": "batch", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "tickets.comments.list (query)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"0\": {\n    \"json\": {\n      \"ticketId\": \"{{ticketId}}\"\n    }\n  }\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/trpc/tickets.comments.list?batch=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["trpc", "tickets.comments.list"],
+              "query": [{ "key": "batch", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "tickets.comments.add (mutation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"0\": {\n    \"json\": {\n      \"ticketId\": \"{{ticketId}}\",\n      \"content\": \"My comment\"\n    }\n  }\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/trpc/tickets.comments.add?batch=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["trpc", "tickets.comments.add"],
+              "query": [{ "key": "batch", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "tickets.assignees.list (query)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"0\": {\n    \"json\": {\n      \"ticketId\": \"{{ticketId}}\"\n    }\n  }\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/trpc/tickets.assignees.list?batch=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["trpc", "tickets.assignees.list"],
+              "query": [{ "key": "batch", "value": "1" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
+

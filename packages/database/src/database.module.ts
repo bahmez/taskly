@@ -5,6 +5,8 @@ import { WorkspacesStore } from './workspaces/workspaces.store';
 import { WorkspacesService } from './workspaces/workspaces.service';
 import { BoardsStore } from './boards/boards.store';
 import { BoardsService } from './boards/boards.service';
+import { TicketsStore } from './tickets/tickets.store';
+import { TicketsService } from './tickets/tickets.service';
 
 @Module({
   providers: [
@@ -14,6 +16,8 @@ import { BoardsService } from './boards/boards.service';
     WorkspacesService,
     BoardsStore,
     BoardsService,
+    TicketsStore,
+    TicketsService,
   ],
   exports: [
     UsersStore,
@@ -22,6 +26,8 @@ import { BoardsService } from './boards/boards.service';
     WorkspacesService,
     BoardsStore,
     BoardsService,
+    TicketsStore,
+    TicketsService,
   ],
 })
 export class DatabaseModule {}
