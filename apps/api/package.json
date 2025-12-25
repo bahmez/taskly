@@ -17,6 +17,7 @@
     "@taskly/auth": "workspace:*",
     "@taskly/database": "workspace:*",
     "@taskly/firebase": "workspace:*",
+    "@taskly/shared": "workspace:*",
     "@taskly/trpc": "workspace:*",
     "@trpc/server": "^11.0.0",
     "cors": "^2.8.5",

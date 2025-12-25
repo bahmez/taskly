@@ -7,7 +7,7 @@ import { AppModule } from './app.module.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '@taskly/trpc';
 import { FIREBASE_AUTH } from '@taskly/firebase';
-import { UsersService } from '@taskly/database';
+import { BoardsService, TicketsService, UsersService, WorkspacesService } from '@taskly/database';
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -36,6 +36,9 @@ async function bootstrap() {
     verifyIdToken: (token: string) => Promise<{ uid: string } & Record<string, unknown>>;
   };
   const usersService = app.get(UsersService);
+  const workspacesService = app.get(WorkspacesService);
+  const boardsService = app.get(BoardsService);
+  const ticketsService = app.get(TicketsService);
 
   // tRPC endpoint (after Nest is created, so we can reuse its providers)
   server.use(
@@ -52,16 +55,74 @@ async function bootstrap() {
           deleteMe: usersService.deleteMe.bind(usersService),
         };
 
+        const workspaces = {
+          createWorkspace: workspacesService.createWorkspace.bind(workspacesService),
+          getWorkspaceById: workspacesService.getWorkspaceById.bind(workspacesService),
+          updateWorkspace: workspacesService.updateWorkspace.bind(workspacesService),
+          archiveWorkspace: workspacesService.archiveWorkspace.bind(workspacesService),
+          listWorkspacesForUser: workspacesService.listWorkspacesForUser.bind(workspacesService),
+
+          getMember: workspacesService.getMember.bind(workspacesService),
+          upsertMember: workspacesService.upsertMember.bind(workspacesService),
+          removeMember: workspacesService.removeMember.bind(workspacesService),
+          listMembers: workspacesService.listMembers.bind(workspacesService),
+          countMembers: workspacesService.countMembers.bind(workspacesService),
+          countAdmins: workspacesService.countAdmins.bind(workspacesService),
+
+          createInvitation: workspacesService.createInvitation.bind(workspacesService),
+          listPendingInvitations: workspacesService.listPendingInvitations.bind(workspacesService),
+          getInvitation: workspacesService.getInvitation.bind(workspacesService),
+          cancelInvitation: workspacesService.cancelInvitation.bind(workspacesService),
+          acceptInvitationByToken: workspacesService.acceptInvitationByToken.bind(workspacesService),
+          declineInvitationByToken: workspacesService.declineInvitationByToken.bind(workspacesService),
+        };
+
+        const boards = {
+          getBoardById: boardsService.getBoardById.bind(boardsService),
+          updateBoard: boardsService.updateBoard.bind(boardsService),
+          archiveBoard: boardsService.archiveBoard.bind(boardsService),
+
+          listBoardsForWorkspace: boardsService.listBoardsForWorkspace.bind(boardsService),
+          createBoard: boardsService.createBoard.bind(boardsService),
+          reorderBoards: boardsService.reorderBoards.bind(boardsService),
+
+          listColumns: boardsService.listColumns.bind(boardsService),
+          createColumn: boardsService.createColumn.bind(boardsService),
+          updateColumn: boardsService.updateColumn.bind(boardsService),
+          deleteColumn: boardsService.deleteColumn.bind(boardsService),
+          reorderColumns: boardsService.reorderColumns.bind(boardsService),
+
+          listTickets: boardsService.listTickets.bind(boardsService),
+          listTicketsByColumn: boardsService.listTicketsByColumn.bind(boardsService),
+          moveTicket: boardsService.moveTicket.bind(boardsService),
+          archiveTicket: boardsService.archiveTicket.bind(boardsService),
+        };
+
+        const tickets = {
+          getById: ticketsService.getById.bind(ticketsService),
+          update: ticketsService.update.bind(ticketsService),
+          archive: ticketsService.archive.bind(ticketsService),
+
+          listComments: ticketsService.listComments.bind(ticketsService),
+          addComment: ticketsService.addComment.bind(ticketsService),
+          updateComment: ticketsService.updateComment.bind(ticketsService),
+          deleteComment: ticketsService.deleteComment.bind(ticketsService),
+
+          getAssigneeIds: ticketsService.getAssigneeIds.bind(ticketsService),
+          addAssignee: ticketsService.addAssignee.bind(ticketsService),
+          removeAssignee: ticketsService.removeAssignee.bind(ticketsService),
+        };
+
         if (!token) {
-          return { user: null, users };
+          return { user: null, users, workspaces, boards, tickets };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users };
+          return { user, users, workspaces, boards, tickets };
         } catch {
-          return { user: null, users };
+          return { user: null, users, workspaces, boards, tickets };
         }
       },
     }),
