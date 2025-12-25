@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import './globals.css';
-import { TRPCProvider } from './trpc-provider';
+import { Providers } from './providers';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
       <body>
-        <TRPCProvider>{children}</TRPCProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
