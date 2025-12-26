@@ -5,6 +5,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import type { WorkspaceRole } from '@taskly/shared';
 import {
+  boardRolePermissions,
   canAssignRole,
   hasPermission,
   ticketRolePermissions,
@@ -77,9 +78,9 @@ export type Ticket = {
   boardId: string;
   columnId: string;
   title: string;
-  description: string;
+  description?: string;
   dueDate: string | null;
-  assigneeIds: string[];
+  assigneeIds?: string[];
   position: number;
   isArchived: boolean;
   archivedAt: string | null;
@@ -120,7 +121,9 @@ export type WorkspacesContext = {
     patch: { title?: string; description?: string },
   ) => Promise<Workspace>;
   archiveWorkspace: (workspaceId: string) => Promise<void>;
+  unarchiveWorkspace: (workspaceId: string) => Promise<void>;
   listWorkspacesForUser: (userId: string) => Promise<Workspace[]>;
+  listArchivedWorkspacesForUser: (userId: string) => Promise<Workspace[]>;
 
   getMember: (workspaceId: string, userId: string) => Promise<WorkspaceMember | null>;
   upsertMember: (workspaceId: string, userId: string, role: WorkspaceRole) => Promise<WorkspaceMember>;
@@ -157,6 +160,10 @@ export type BoardsContext = {
 
   listTickets: (boardId: string) => Promise<Ticket[]>;
   listTicketsByColumn: (boardId: string, columnId: string) => Promise<Ticket[]>;
+  createTicket: (
+    boardId: string,
+    input: { columnId: string; title: string; description?: string; dueDate?: string | null; assigneeIds?: string[] },
+  ) => Promise<Ticket>;
   moveTicket: (boardId: string, ticketId: string, input: { columnId: string; position: number }) => Promise<void>;
   archiveTicket: (boardId: string, ticketId: string) => Promise<void>;
 };
@@ -236,6 +243,30 @@ async function requireWorkspacePermission(
   return { workspace: ws, member, role };
 }
 
+async function requireWorkspacePermissionAllowArchived(
+  ctx: Context,
+  workspaceId: string,
+  required: string,
+): Promise<{ workspace: Workspace; member: WorkspaceMember; role: WorkspaceRole }> {
+  const ws = await ctx.workspaces.getWorkspaceById(workspaceId);
+  if (!ws) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Workspace not found' });
+  }
+
+  const member = await ctx.workspaces.getMember(workspaceId, ctx.user!.id);
+  if (!member) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Not a workspace member' });
+  }
+
+  const role = member.role;
+  const grants = workspaceRolePermissions[role] ?? [];
+  if (!hasPermission(grants, required)) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Missing permission' });
+  }
+
+  return { workspace: ws, member, role };
+}
+
 async function requireTicketPermission(
   ctx: Context,
   ticketId: string,
@@ -257,6 +288,26 @@ async function requireTicketPermission(
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Missing permission' });
   }
   return { ticket, role, workspaceId };
+}
+
+async function requireBoardPermission(
+  ctx: Context,
+  boardId: string,
+  required: string,
+): Promise<{ board: Board; role: WorkspaceRole; workspaceId: string; grants: string[] }> {
+  const board = await ctx.boards.getBoardById(boardId);
+  if (!board || board.isArchived) throw new TRPCError({ code: 'NOT_FOUND', message: 'Board not found' });
+
+  const workspaceId = board.workspaceId;
+  const member = await ctx.workspaces.getMember(workspaceId, ctx.user!.id);
+  if (!member) throw new TRPCError({ code: 'FORBIDDEN', message: 'Not a workspace member' });
+
+  const role = member.role;
+  const grants = (boardRolePermissions[role] ?? []) as string[];
+  if (!hasPermission(grants, required)) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Missing permission' });
+  }
+  return { board, role, workspaceId, grants };
 }
 
 export const appRouter = router({
@@ -303,9 +354,14 @@ export const appRouter = router({
     }),
   }),
   workspaces: router({
-    list: protectedProcedure.query(({ ctx }) =>
-      ctx.workspaces.listWorkspacesForUser(ctx.user!.id),
-    ),
+    list: protectedProcedure
+      .input(z.object({ archived: z.boolean().optional() }).optional())
+      .query(({ ctx, input }) => {
+        const archived = Boolean(input?.archived);
+        return archived
+          ? ctx.workspaces.listArchivedWorkspacesForUser(ctx.user!.id)
+          : ctx.workspaces.listWorkspacesForUser(ctx.user!.id);
+      }),
 
     create: protectedProcedure
       .input(
@@ -359,6 +415,14 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.meta.write');
         await ctx.workspaces.archiveWorkspace(input.workspaceId);
+        return { ok: true };
+      }),
+
+    unarchive: protectedProcedure
+      .input(z.object({ workspaceId: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        await requireWorkspacePermissionAllowArchived(ctx, input.workspaceId, 'workspace.meta.write');
+        await ctx.workspaces.unarchiveWorkspace(input.workspaceId);
         return { ok: true };
       }),
 
@@ -642,6 +706,122 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
           await ctx.tickets.removeAssignee(input.ticketId, input.userId);
+          return { ok: true };
+        }),
+    }),
+  }),
+  boards: router({
+    view: protectedProcedure
+      .input(z.object({ boardId: z.string().min(1) }))
+      .query(async ({ ctx, input }) => {
+        const { board, grants } = await requireBoardPermission(ctx, input.boardId, 'board.meta.read');
+        const canColumnsRead = hasPermission(grants, 'board.columns.read');
+        const canTicketsRead = hasPermission(grants, 'board.tickets.read');
+        const canTicketContentRead = hasPermission(grants, 'ticket.content.read');
+
+        const [columns, tickets] = await Promise.all([
+          canColumnsRead ? ctx.boards.listColumns(input.boardId) : Promise.resolve([]),
+          canTicketsRead ? ctx.boards.listTickets(input.boardId) : Promise.resolve([]),
+        ]);
+
+        const safeTickets = tickets.map((t) => ({
+          ...t,
+          description: canTicketContentRead ? t.description : undefined,
+        }));
+
+        return {
+          board,
+          columns,
+          tickets: safeTickets,
+        };
+      }),
+
+    columns: router({
+      create: protectedProcedure
+        .input(z.object({ boardId: z.string().min(1), title: z.string().min(1).max(200), key: z.string().min(1).max(64).optional() }))
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.columns.write');
+          const key =
+            (input.key?.trim() ||
+              input.title
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '')
+                .slice(0, 48) ||
+              'column') + '_' + crypto.randomBytes(4).toString('hex');
+          return await ctx.boards.createColumn(input.boardId, { title: input.title.trim(), key });
+        }),
+
+      update: protectedProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(1),
+            columnId: z.string().min(1),
+            title: z.string().min(1).max(200).optional(),
+            key: z.string().min(1).max(64).optional(),
+          }),
+        )
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.columns.write');
+          const patch: { title?: string; key?: string } = {};
+          if (typeof input.title === 'string') patch.title = input.title.trim();
+          if (typeof input.key === 'string') patch.key = input.key.trim();
+          return await ctx.boards.updateColumn(input.boardId, input.columnId, patch);
+        }),
+
+      remove: protectedProcedure
+        .input(z.object({ boardId: z.string().min(1), columnId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.columns.write');
+          await ctx.boards.deleteColumn(input.boardId, input.columnId);
+          return { ok: true };
+        }),
+
+      reorder: protectedProcedure
+        .input(z.object({ boardId: z.string().min(1), columnIds: z.array(z.string().min(1)).min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.columns.write');
+          if (new Set(input.columnIds).size !== input.columnIds.length) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'columnIds must be unique' });
+          }
+          await ctx.boards.reorderColumns(input.boardId, input.columnIds);
+          return { ok: true };
+        }),
+    }),
+
+    tickets: router({
+      create: protectedProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(1),
+            columnId: z.string().min(1),
+            title: z.string().min(1).max(200),
+            description: z.string().optional(),
+          }),
+        )
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.tickets.write');
+          return await ctx.boards.createTicket(input.boardId, {
+            columnId: input.columnId,
+            title: input.title.trim(),
+            description: input.description ?? '',
+          });
+        }),
+
+      move: protectedProcedure
+        .input(z.object({ boardId: z.string().min(1), ticketId: z.string().min(1), columnId: z.string().min(1), position: z.number().int().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.tickets.write');
+          await ctx.boards.moveTicket(input.boardId, input.ticketId, { columnId: input.columnId, position: input.position });
+          return { ok: true };
+        }),
+
+      remove: protectedProcedure
+        .input(z.object({ boardId: z.string().min(1), ticketId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.tickets.write');
+          await ctx.boards.archiveTicket(input.boardId, input.ticketId);
           return { ok: true };
         }),
     }),
