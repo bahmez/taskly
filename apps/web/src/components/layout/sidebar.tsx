@@ -1,9 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { Button, Collapsible, CollapsibleTrigger, CollapsibleContent, cn } from "@taskly/ui"
-import { ChevronLeft, ChevronRight, Trello, Users, Settings, Plus, Layout } from "lucide-react"
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input, cn } from "@taskly/ui"
+import { ChevronLeft, ChevronRight, Trello, Users, Settings, Plus } from "lucide-react"
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { api } from "@/app/trpc"
+import { useWorkspaceUI } from "@/components/workspace/workspace-ui-provider"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed?: boolean
@@ -15,6 +18,34 @@ export function Sidebar({ className, isCollapsed: controlledCollapsed, onCollaps
   
   const isCollapsed = controlledCollapsed ?? isCollapsedInternal
   const setIsCollapsed = onCollapse ?? setIsCollapsedInternal
+
+  const pathname = usePathname()
+  const router = useRouter()
+  const utils = api.useUtils()
+  const isDashboardOverview = pathname === "/dashboard" || pathname === "/workspaces"
+
+  const goToWorkspace = (workspaceId: string) => {
+    setSelectedWorkspaceId(workspaceId)
+    router.push(`/dashboard/workspaces/${workspaceId}`)
+  }
+
+  const { workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useWorkspaceUI()
+  const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId) ?? null
+
+  const boardsQuery = api.workspaces.boards.list.useQuery(
+    { workspaceId: selectedWorkspaceId ?? "" },
+    { enabled: Boolean(selectedWorkspaceId) },
+  )
+
+  const createBoard = api.workspaces.boards.create.useMutation({
+    onSuccess: async (board) => {
+      await utils.workspaces.boards.list.invalidate({ workspaceId: board.workspaceId })
+      router.push(`/dashboard/boards/${board.id}`)
+    },
+  })
+
+  const [createBoardOpen, setCreateBoardOpen] = React.useState(false)
+  const [newBoardTitle, setNewBoardTitle] = React.useState("")
 
   return (
     <div className={cn(
@@ -37,15 +68,19 @@ export function Sidebar({ className, isCollapsed: controlledCollapsed, onCollaps
       {/* Content */}
       <div className={cn("flex-1 overflow-y-auto py-3", isCollapsed ? "px-2" : "px-3")}>
          {/* Workspace Section */}
-         {!isCollapsed && (
+         {!isCollapsed && !isDashboardOverview && (
            <div className="mb-4 flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
                  <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold">
-                    T
+                    {(selectedWorkspace?.title?.[0] ?? "W").toUpperCase()}
                  </div>
                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-[#b6c2cf]">Taskly Workspace</span>
-                    <span className="text-xs text-[#9fadbc]">Free</span>
+                    <span className="text-sm font-semibold text-[#b6c2cf]">
+                      {selectedWorkspace?.title ?? "No workspace"}
+                    </span>
+                    <span className="text-xs text-[#9fadbc]">
+                      {workspaces.length ? `${workspaces.length} workspace(s)` : "Create your first workspace"}
+                    </span>
                  </div>
               </div>
            </div>
@@ -53,51 +88,124 @@ export function Sidebar({ className, isCollapsed: controlledCollapsed, onCollaps
          
          {/* Navigation Links */}
          <nav className="space-y-1">
-            <NavItem icon={<Trello className="h-4 w-4" />} label="Boards" href="/boards" isCollapsed={isCollapsed} active />
-            <NavItem icon={<Users className="h-4 w-4" />} label="Members" href="/members" isCollapsed={isCollapsed} />
-            <NavItem icon={<Settings className="h-4 w-4" />} label="Settings" href="/settings" isCollapsed={isCollapsed} />
+            {isDashboardOverview ? (
+              <NavItem
+                icon={<Trello className="h-4 w-4" />}
+                label="Workspaces"
+                href="/dashboard"
+                isCollapsed={isCollapsed}
+                active={pathname === "/dashboard" || pathname === "/workspaces"}
+              />
+            ) : (
+              <>
+                <NavItem
+                  icon={<Trello className="h-4 w-4" />}
+                  label="Boards"
+                  href="/dashboard"
+                  isCollapsed={isCollapsed}
+                  active={pathname === "/dashboard" || pathname.startsWith("/dashboard/boards/") || pathname.startsWith("/dashboard/workspaces/")}
+                />
+                <NavItem
+                  icon={<Users className="h-4 w-4" />}
+                  label="Members"
+                  href="/dashboard/members"
+                  isCollapsed={isCollapsed}
+                  active={pathname.startsWith("/dashboard/members")}
+                />
+                <NavItem
+                  icon={<Settings className="h-4 w-4" />}
+                  label="Settings"
+                  href="/dashboard/settings"
+                  isCollapsed={isCollapsed}
+                  active={pathname.startsWith("/dashboard/settings")}
+                />
+              </>
+            )}
          </nav>
 
-         {/* Workspace Views (Collapsible) */}
-         {!isCollapsed && (
+          {/* Your Boards */}
+          {!isCollapsed && !isDashboardOverview && (
             <div className="mt-6">
                <div className="flex items-center justify-between px-2 mb-2">
-                  <span className="text-xs font-semibold text-[#9fadbc] uppercase">Workspace views</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-[#9fadbc] hover:bg-[#a6c5e229]">
-                     <Plus className="h-3 w-3" />
-                  </Button>
+                  <span className="text-xs font-semibold text-[#9fadbc] uppercase">Your boards</span>
+                  <Dialog open={createBoardOpen} onOpenChange={setCreateBoardOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-[#9fadbc] hover:bg-[#a6c5e229]"
+                        disabled={!selectedWorkspaceId}
+                        title={selectedWorkspaceId ? "Create board" : "Select a workspace first"}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create board</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-2">
+                        <Input
+                          value={newBoardTitle}
+                          onChange={(e) => setNewBoardTitle(e.target.value)}
+                          placeholder="Board title"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="trello"
+                          disabled={!selectedWorkspaceId || !newBoardTitle.trim() || createBoard.isPending}
+                          onClick={() => {
+                            if (!selectedWorkspaceId) return
+                            createBoard.mutate({ workspaceId: selectedWorkspaceId, title: newBoardTitle.trim() })
+                            setNewBoardTitle("")
+                            setCreateBoardOpen(false)
+                          }}
+                        >
+                          Create
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                </div>
                <nav className="space-y-1">
-                  <NavItem icon={<Layout className="h-4 w-4" />} label="Table" href="/views/table" isCollapsed={isCollapsed} />
-                  <NavItem icon={<CalendarIcon />} label="Calendar" href="/views/calendar" isCollapsed={isCollapsed} />
+                  {boardsQuery.data?.map((b) => (
+                    <NavItem
+                      key={b.id}
+                      icon={<div className="h-2 w-2 rounded-full bg-blue-400" />}
+                      label={b.title}
+                      href={`/dashboard/boards/${b.id}`}
+                      isCollapsed={isCollapsed}
+                      active={pathname === `/dashboard/boards/${b.id}`}
+                    />
+                  ))}
                </nav>
             </div>
          )}
 
-          {/* Your Boards */}
-          {!isCollapsed && (
-            <div className="mt-6">
-               <div className="flex items-center justify-between px-2 mb-2">
-                  <span className="text-xs font-semibold text-[#9fadbc] uppercase">Your boards</span>
-                   <Button variant="ghost" size="icon" className="h-6 w-6 text-[#9fadbc] hover:bg-[#a6c5e229]">
-                     <Plus className="h-3 w-3" />
-                  </Button>
-               </div>
-               <nav className="space-y-1">
-                   <NavItem 
-                      icon={<div className="h-2 w-2 rounded-full bg-blue-400" />} 
-                      label="Taskly Development" 
-                      href="/b/1" 
-                      isCollapsed={isCollapsed} 
-                    />
-                     <NavItem 
-                      icon={<div className="h-2 w-2 rounded-full bg-green-400" />} 
-                      label="Design System" 
-                      href="/b/2" 
-                      isCollapsed={isCollapsed} 
-                    />
-               </nav>
-            </div>
+         {/* Workspaces switcher (simple) */}
+         {!isCollapsed && !isDashboardOverview && workspaces.length > 1 && (
+           <div className="mt-6 px-2">
+             <div className="text-xs font-semibold text-[#9fadbc] uppercase mb-2">Workspaces</div>
+             <div className="space-y-1">
+               {workspaces.map((w) => (
+                 <Button
+                   key={w.id}
+                   variant="ghost"
+                   className={cn(
+                     "w-full justify-start px-2 h-9 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#b6c2cf]",
+                     w.id === selectedWorkspaceId && "bg-[#a6c5e229] text-[#579dff]",
+                   )}
+                  onClick={() => goToWorkspace(w.id)}
+                 >
+                   <span className="mr-3 flex h-5 w-5 items-center justify-center rounded bg-[#579dff] text-[#1d2125] text-xs font-bold">
+                     {w.title?.[0]?.toUpperCase() ?? "W"}
+                   </span>
+                   <span className="truncate">{w.title}</span>
+                 </Button>
+               ))}
+             </div>
+           </div>
          )}
       </div>
     </div>
@@ -138,25 +246,3 @@ function NavItem({ icon, label, href, isCollapsed, active }: { icon: React.React
       </Button>
    )
 }
-
-function CalendarIcon() {
-   return (
-      <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-    >
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-   )
-}
-

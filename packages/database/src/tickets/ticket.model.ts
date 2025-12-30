@@ -13,6 +13,14 @@ export type TicketModel = {
   updatedAt: string;
 };
 
+export type TicketCreateInput = {
+  columnId: string;
+  title: string;
+  description?: string;
+  dueDate?: string | null;
+  assigneeIds?: string[];
+};
+
 export type TicketUpdateInput = Partial<Pick<TicketModel, 'title' | 'description' | 'dueDate'>>;
 
 export type TicketCommentModel = {

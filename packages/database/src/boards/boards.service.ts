@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type {
   BoardColumnCreateInput,
   BoardColumnModel,
@@ -7,12 +7,12 @@ import type {
   BoardModel,
   BoardUpdateInput,
 } from './board.model';
-import type { TicketModel } from '../tickets/ticket.model';
+import type { TicketCreateInput, TicketModel } from '../tickets/ticket.model';
 import { BoardsStore } from './boards.store';
 
 @Injectable()
 export class BoardsService {
-  constructor(private readonly store: BoardsStore) {}
+  constructor(@Inject(BoardsStore) private readonly store: BoardsStore) {}
 
   createBoard(input: BoardCreateInput): Promise<BoardModel> {
     return this.store.createBoard(input);
@@ -64,6 +64,10 @@ export class BoardsService {
 
   listTicketsByColumn(boardId: string, columnId: string): Promise<TicketModel[]> {
     return this.store.listTicketsByColumn(boardId, columnId);
+  }
+
+  createTicket(boardId: string, input: TicketCreateInput): Promise<TicketModel> {
+    return this.store.createTicket(boardId, input);
   }
 
   moveTicket(boardId: string, ticketId: string, input: { columnId: string; position: number }): Promise<void> {

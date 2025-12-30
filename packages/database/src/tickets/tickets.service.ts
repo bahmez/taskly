@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { TicketCommentModel, TicketModel, TicketUpdateInput } from './ticket.model';
 import { TicketsStore } from './tickets.store';
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly store: TicketsStore) {}
+  constructor(@Inject(TicketsStore) private readonly store: TicketsStore) {}
 
   getById(ticketId: string): Promise<TicketModel | null> {
     return this.store.getById(ticketId);

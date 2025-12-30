@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type {
   WorkspaceCreateInput,
   WorkspaceInvitationModel,
@@ -11,7 +11,7 @@ import { WorkspacesStore } from './workspaces.store';
 
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly store: WorkspacesStore) {}
+  constructor(@Inject(WorkspacesStore) private readonly store: WorkspacesStore) {}
 
   createWorkspace(input: WorkspaceCreateInput): Promise<WorkspaceModel> {
     return this.store.createWorkspace(input);
@@ -29,8 +29,16 @@ export class WorkspacesService {
     return this.store.archiveWorkspace(workspaceId);
   }
 
+  unarchiveWorkspace(workspaceId: string): Promise<void> {
+    return this.store.unarchiveWorkspace(workspaceId);
+  }
+
   listWorkspacesForUser(userId: string): Promise<WorkspaceModel[]> {
     return this.store.listWorkspacesForUser(userId);
+  }
+
+  listArchivedWorkspacesForUser(userId: string): Promise<WorkspaceModel[]> {
+    return this.store.listArchivedWorkspacesForUser(userId);
   }
 
   getMember(workspaceId: string, userId: string): Promise<WorkspaceMemberModel | null> {

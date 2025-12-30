@@ -9,7 +9,7 @@ import type {
   BoardModel,
   BoardUpdateInput,
 } from './board.model';
-import type { TicketModel } from '../tickets/ticket.model';
+import type { TicketCreateInput, TicketModel } from '../tickets/ticket.model';
 
 type BoardDoc = Omit<BoardModel, 'id'>;
 type ColumnDoc = Omit<BoardColumnModel, 'id' | 'boardId'>;
@@ -205,6 +205,35 @@ export class BoardsStore {
       .orderBy('position', 'asc')
       .get();
     return snap.docs.map((d) => ({ id: d.id, boardId, ...(d.data() as TicketDoc) }));
+  }
+
+  async createTicket(boardId: string, input: TicketCreateInput): Promise<TicketModel> {
+    const now = nowIso();
+
+    const last = await this.ticketsCol(boardId)
+      .where('isArchived', '==', false)
+      .where('columnId', '==', input.columnId)
+      .orderBy('position', 'desc')
+      .limit(1)
+      .get();
+    const max = last.empty ? 0 : ((last.docs[0]!.data() as TicketDoc).position ?? 0);
+    const position = max + 1;
+
+    const ref = this.ticketsCol(boardId).doc();
+    const doc: TicketDoc = {
+      columnId: input.columnId,
+      title: input.title,
+      description: input.description ?? '',
+      dueDate: input.dueDate ?? null,
+      assigneeIds: input.assigneeIds ?? [],
+      position,
+      isArchived: false,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await ref.create(doc);
+    return { id: ref.id, boardId, ...doc };
   }
 
   async moveTicket(
