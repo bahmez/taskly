@@ -736,6 +736,24 @@ export const appRouter = router({
         };
       }),
 
+    update: protectedProcedure
+      .input(
+        z.object({
+          boardId: z.string().min(1),
+          title: z.string().min(1).max(200).optional(),
+          description: z.string().max(2000).optional(),
+          background: z.string().nullable().optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireBoardPermission(ctx, input.boardId, 'board.meta.write');
+        const patch: { title?: string; description?: string; background?: string | null } = {};
+        if (typeof input.title === 'string') patch.title = input.title.trim();
+        if (typeof input.description === 'string') patch.description = input.description.trim();
+        if (input.background === null || typeof input.background === 'string') patch.background = input.background;
+        return await ctx.boards.updateBoard(input.boardId, patch);
+      }),
+
     columns: router({
       create: protectedProcedure
         .input(z.object({ boardId: z.string().min(1), title: z.string().min(1).max(200), key: z.string().min(1).max(64).optional() }))
