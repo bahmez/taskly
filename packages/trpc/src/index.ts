@@ -83,6 +83,15 @@ export type BoardLabel = {
   updatedAt: string;
 };
 
+export type TicketPermissions = {
+  role: WorkspaceRole;
+  canContentWrite: boolean;
+  canCommentsRead: boolean;
+  canCommentsWrite: boolean;
+  canAssignmentsRead: boolean;
+  canAssignmentsWrite: boolean;
+};
+
 export type Ticket = {
   id: string;
   boardId: string;
@@ -97,6 +106,7 @@ export type Ticket = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  permissions?: TicketPermissions;
 };
 
 export type TicketComment = {
@@ -418,6 +428,14 @@ export const appRouter = router({
         return user;
       }),
 
+    byIds: protectedProcedure
+      .input(z.object({ ids: z.array(z.string().min(1)).max(200) }))
+      .query(async ({ ctx, input }) => {
+        const ids = Array.from(new Set(input.ids));
+        const users = await Promise.all(ids.map((id) => ctx.users.getById(id)));
+        return users.filter(Boolean) as User[];
+      }),
+
     search: protectedProcedure
       .input(
         z.object({
@@ -708,10 +726,19 @@ export const appRouter = router({
       .input(z.object({ ticketId: z.string().min(1) }))
       .query(async ({ ctx, input }) => {
         const { ticket, role } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
-        const canAssignmentsRead = hasPermission(ticketRolePermissions[role] ?? [], 'ticket.assignments.read');
+        const grants = ticketRolePermissions[role] ?? [];
+        const canAssignmentsRead = hasPermission(grants, 'ticket.assignments.read');
         return {
           ...ticket,
           assigneeIds: canAssignmentsRead ? ticket.assigneeIds : undefined,
+          permissions: {
+            role,
+            canContentWrite: hasPermission(grants, 'ticket.content.write'),
+            canCommentsRead: hasPermission(grants, 'ticket.comments.read'),
+            canCommentsWrite: hasPermission(grants, 'ticket.comments.write'),
+            canAssignmentsRead: hasPermission(grants, 'ticket.assignments.read'),
+            canAssignmentsWrite: hasPermission(grants, 'ticket.assignments.write'),
+          },
         };
       }),
 
@@ -997,6 +1024,10 @@ export const appRouter = router({
           board,
           columns,
           tickets: safeTickets,
+          permissions: {
+            canMetaWrite: hasPermission(grants, 'board.meta.write'),
+            canLabelsWrite: hasPermission(grants, 'board.meta.write'),
+          },
         };
       }),
 

@@ -25,22 +25,45 @@ function nowIso(): string {
 export class TicketsStore {
   constructor(@Inject(FIRESTORE) private readonly db: Firestore) {}
 
+  // Cache ticketId -> boardId to avoid scanning boards for every sub-query (comments, attachments, etc.)
+  private readonly ticketBoardCache = new Map<string, { boardId: string; path: string; at: number }>();
+  private readonly ticketBoardCacheTtlMs = 5 * 60_000;
+
   private ticketsGroup() {
     // boards/{boardId}/tickets/{ticketId}
     return this.db.collectionGroup('tickets');
   }
 
   private async findTicketDoc(ticketId: string) {
-    const snap = await this.ticketsGroup()
-      .where(FieldPath.documentId(), '==', ticketId)
-      .limit(1)
-      .get();
-    if (snap.empty) return null;
-    const doc = snap.docs[0]!;
-    const boardRef = doc.ref.parent.parent;
-    const boardId = boardRef?.id ?? null;
-    if (!boardId) return null;
-    return { doc, boardId };
+    // Firestore collectionGroup queries on documentId require a FULL document path, not a bare id.
+    // Since we only have ticketId, we resolve it by scanning boards and probing boards/{boardId}/tickets/{ticketId}.
+    // We keep a small in-memory cache to avoid repeated scans.
+
+    const cached = this.ticketBoardCache.get(ticketId);
+    if (cached && Date.now() - cached.at < this.ticketBoardCacheTtlMs) {
+      const ref = this.db.doc(cached.path);
+      const snap = await ref.get();
+      if (snap.exists) return { doc: snap, boardId: cached.boardId };
+      this.ticketBoardCache.delete(ticketId);
+    }
+
+    const boards = await this.db.collection('boards').listDocuments();
+    const batchSize = 20;
+
+    for (let i = 0; i < boards.length; i += batchSize) {
+      const slice = boards.slice(i, i + batchSize);
+      const snaps = await Promise.all(slice.map((b) => b.collection('tickets').doc(ticketId).get()));
+      for (let j = 0; j < snaps.length; j++) {
+        const s = snaps[j]!;
+        if (!s.exists) continue;
+        const boardId = slice[j]!.id;
+        const path = `boards/${boardId}/tickets/${ticketId}`;
+        this.ticketBoardCache.set(ticketId, { boardId, path, at: Date.now() });
+        return { doc: s, boardId };
+      }
+    }
+
+    return null;
   }
 
   private commentCol(boardId: string, ticketId: string) {

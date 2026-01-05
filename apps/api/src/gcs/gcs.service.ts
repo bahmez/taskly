@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Storage } from '@google-cloud/storage';
+import path from 'node:path';
 
 type SignedUrlResult = {
   url: string;
@@ -16,7 +17,13 @@ function addMinutesIso(minutes: number): string {
 
 @Injectable()
 export class GcsService {
-  private readonly storage = new Storage();
+  private readonly storage: Storage;
+
+  constructor() {
+    const keyFilename = (process.env.GOOGLE_APPLICATION_CREDENTIALS ?? '').trim();
+    // Force using the provided key file when set (avoids falling back to "authorized_user" ADC locally).
+    this.storage = keyFilename ? new Storage({ keyFilename }) : new Storage();
+  }
 
   private getBucketName(): string {
     return (
@@ -35,54 +42,72 @@ export class GcsService {
   }
 
   async signedUploadUrl(input: { objectPath: string; contentType: string; expiresInMinutes?: number; resumable?: boolean }): Promise<SignedUrlResult> {
-    const expiresInMinutes = input.expiresInMinutes ?? 15;
-    const expiresAt = addMinutesIso(expiresInMinutes);
-    const expires = Date.parse(expiresAt);
+    try {
+      const expiresInMinutes = input.expiresInMinutes ?? 15;
+      const expiresAt = addMinutesIso(expiresInMinutes);
+      const expires = Date.parse(expiresAt);
 
-    const file = this.bucket().file(input.objectPath);
-    const resumable = Boolean(input.resumable ?? true);
+      const file = this.bucket().file(input.objectPath);
+      const resumable = Boolean(input.resumable ?? true);
 
-    const action = resumable ? 'resumable' : 'write';
-    const [url] = await file.getSignedUrl({
-      version: 'v4',
-      action,
-      expires,
-      contentType: input.contentType,
-    });
+      const action = resumable ? 'resumable' : 'write';
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action,
+        expires,
+        contentType: input.contentType,
+      });
 
-    if (resumable) {
-      // Client should POST with "x-goog-resumable: start" to get the session URL (Location header).
+      if (resumable) {
+        // Client should POST with "x-goog-resumable: start" to get the session URL (Location header).
+        return {
+          url,
+          method: 'POST',
+          headers: { 'Content-Type': input.contentType, 'x-goog-resumable': 'start' },
+          expiresAt,
+          type: 'resumable',
+        };
+      }
+
       return {
         url,
-        method: 'POST',
-        headers: { 'Content-Type': input.contentType, 'x-goog-resumable': 'start' },
+        method: 'PUT',
+        headers: { 'Content-Type': input.contentType },
         expiresAt,
-        type: 'resumable',
+        type: 'write',
       };
+    } catch (error) {
+      const err = error as { message?: string };
+      const credsPath = (process.env.GOOGLE_APPLICATION_CREDENTIALS ?? '').trim();
+      const credsHint = credsPath ? `GOOGLE_APPLICATION_CREDENTIALS=${path.basename(credsPath)}` : 'GOOGLE_APPLICATION_CREDENTIALS is not set';
+      throw new Error(
+        `GCS upload URL generation failed: ${err.message ?? 'Unknown error'}. ${credsHint}. Make sure you are using a service_account JSON (type=service_account) with client_email + private_key.`,
+      );
     }
-
-    return {
-      url,
-      method: 'PUT',
-      headers: { 'Content-Type': input.contentType },
-      expiresAt,
-      type: 'write',
-    };
   }
 
   async signedDownloadUrl(input: { objectPath: string; expiresInMinutes?: number }): Promise<SignedUrlResult> {
-    const expiresInMinutes = input.expiresInMinutes ?? 15;
-    const expiresAt = addMinutesIso(expiresInMinutes);
-    const expires = Date.parse(expiresAt);
+    try {
+      const expiresInMinutes = input.expiresInMinutes ?? 15;
+      const expiresAt = addMinutesIso(expiresInMinutes);
+      const expires = Date.parse(expiresAt);
 
-    const file = this.bucket().file(input.objectPath);
-    const [url] = await file.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires,
-    });
+      const file = this.bucket().file(input.objectPath);
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires,
+      });
 
-    return { url, method: 'GET', headers: {}, expiresAt, type: 'read' };
+      return { url, method: 'GET', headers: {}, expiresAt, type: 'read' };
+    } catch (error) {
+      const err = error as { message?: string };
+      const credsPath = (process.env.GOOGLE_APPLICATION_CREDENTIALS ?? '').trim();
+      const credsHint = credsPath ? `GOOGLE_APPLICATION_CREDENTIALS=${path.basename(credsPath)}` : 'GOOGLE_APPLICATION_CREDENTIALS is not set';
+      throw new Error(
+        `GCS download URL generation failed: ${err.message ?? 'Unknown error'}. ${credsHint}. Make sure you are using a service_account JSON (type=service_account) with client_email + private_key.`,
+      );
+    }
   }
 
   async deleteObject(objectPath: string): Promise<void> {
