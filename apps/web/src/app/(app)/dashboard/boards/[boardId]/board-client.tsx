@@ -91,30 +91,6 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     onError: (e) => toast({ title: 'Cannot move ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
-  const createLabel = api.boards.labels.create.useMutation({
-    onSuccess: async () => {
-      await utils.boards.labels.list.invalidate({ boardId });
-      await utils.boards.view.invalidate({ boardId });
-    },
-    onError: (e) => toast({ title: 'Cannot create label', description: trpcErrorMessage(e), variant: 'destructive' }),
-  });
-
-  const updateLabel = api.boards.labels.update.useMutation({
-    onSuccess: async () => {
-      await utils.boards.labels.list.invalidate({ boardId });
-      await utils.boards.view.invalidate({ boardId });
-    },
-    onError: (e) => toast({ title: 'Cannot update label', description: trpcErrorMessage(e), variant: 'destructive' }),
-  });
-
-  const deleteLabel = api.boards.labels.remove.useMutation({
-    onSuccess: async () => {
-      await utils.boards.labels.list.invalidate({ boardId });
-      await utils.boards.view.invalidate({ boardId });
-    },
-    onError: (e) => toast({ title: 'Cannot delete label', description: trpcErrorMessage(e), variant: 'destructive' }),
-  });
-
   const [newColumnTitle, setNewColumnTitle] = React.useState('');
   const [newCardTitleByColumn, setNewCardTitleByColumn] = React.useState<Record<string, string>>({});
   const [newCardDescByColumn, setNewCardDescByColumn] = React.useState<Record<string, string>>({});
@@ -132,10 +108,6 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
   const [openedTicketId, setOpenedTicketId] = React.useState<string | null>(null);
 
-  const [labelsDialogOpen, setLabelsDialogOpen] = React.useState(false);
-  const [newLabelName, setNewLabelName] = React.useState('');
-  const [newLabelColor, setNewLabelColor] = React.useState('#94a3b8');
-
   const [confirmDialog, setConfirmDialog] = React.useState<{ open: boolean; title: string; description?: string; onConfirm: () => void }>({
     open: false,
     title: '',
@@ -151,6 +123,57 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
   const { board, columns, tickets } = viewQuery.data;
   const boardLabels = labelsQuery.data ?? [];
+
+  const allAssigneeIds = React.useMemo(() => {
+    const ids = tickets.flatMap((t) => t.assigneeIds ?? []);
+    return Array.from(new Set(ids));
+  }, [tickets]);
+
+  const assigneeUsersQuery = api.users.byIds.useQuery(
+    { ids: allAssigneeIds },
+    { enabled: allAssigneeIds.length > 0, staleTime: 60_000 },
+  );
+
+  const usersById = React.useMemo(() => {
+    return new Map((assigneeUsersQuery.data ?? []).map((u) => [u.id, u]));
+  }, [assigneeUsersQuery.data]);
+
+  const formatUserPrimary = React.useCallback(
+    (userId: string): string => {
+      const u = usersById.get(userId);
+      if (!u) return userId;
+      const displayName = (u as any)?.displayName ?? (u as any)?.display_name;
+      if (typeof displayName === 'string' && displayName.trim()) return displayName.trim();
+      const full = `${(u as any)?.first_name ?? ''} ${(u as any)?.last_name ?? ''}`.trim();
+      if (full) return full;
+      if ((u as any)?.username) return String((u as any).username);
+      return userId;
+    },
+    [usersById],
+  );
+
+  const formatUserSecondary = React.useCallback(
+    (userId: string): string => {
+      const u = usersById.get(userId) as any;
+      if (!u) return '';
+      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+      if (u.username && full) return `@${u.username}`;
+      return '';
+    },
+    [usersById],
+  );
+
+  const initialsForUser = React.useCallback(
+    (userId: string): string => {
+      const u = usersById.get(userId) as any;
+      if (!u) return getUserInitials(userId);
+      const displayName = u?.displayName ?? u?.display_name;
+      if (typeof displayName === 'string' && displayName.trim()) return getUserInitials(displayName.trim());
+      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+      return getUserInitials(full || u.username || userId);
+    },
+    [usersById],
+  );
 
   const ticketsByColumn = new Map<string, typeof tickets>();
   for (const c of columns) ticketsByColumn.set(c.id, []);
@@ -209,82 +232,6 @@ export default function BoardClient({ boardId }: { boardId: string }) {
         </div>
 
         <div className="flex gap-2">
-          <Dialog open={labelsDialogOpen} onOpenChange={setLabelsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="trelloGray" size="sm">
-                <Tag className="h-4 w-4 mr-2" />
-                Labels
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
-              <DialogHeader>
-                <DialogTitle>Board Labels</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  {boardLabels.map((label) => (
-                    <div key={label.id} className="flex items-center gap-2 p-2 rounded bg-[#282e33] border border-[#9fadbc29]">
-                      <div
-                        className="h-8 w-16 rounded"
-                        style={{ backgroundColor: label.color }}
-                      />
-                      <div className="flex-1 text-sm font-medium">{label.name}</div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setConfirmDialog({
-                            open: true,
-                            title: 'Delete label',
-                            description: `Delete label "${label.name}"?`,
-                            onConfirm: () => deleteLabel.mutate({ boardId, labelId: label.id }),
-                          });
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t border-[#9fadbc29] pt-4">
-                  <div className="text-sm font-medium mb-2">Create new label</div>
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Label name"
-                      value={newLabelName}
-                      onChange={(e) => setNewLabelName(e.target.value)}
-                    />
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={newLabelColor}
-                        onChange={(e) => setNewLabelColor(e.target.value)}
-                        className="h-10 w-20 rounded cursor-pointer"
-                      />
-                      <Button
-                        variant="trello"
-                        disabled={!newLabelName.trim() || createLabel.isPending}
-                        onClick={() => {
-                          createLabel.mutate(
-                            { boardId, name: newLabelName.trim(), color: newLabelColor },
-                            {
-                              onSuccess: () => {
-                                setNewLabelName('');
-                                setNewLabelColor('#94a3b8');
-                              },
-                            }
-                          );
-                        }}
-                      >
-                        Create
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="trello">Add column</Button>
@@ -515,9 +462,13 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                           {t.assigneeIds && t.assigneeIds.length > 0 && (
                             <div className="flex -space-x-1 ml-auto">
                               {t.assigneeIds.slice(0, 3).map((aid) => (
-                                <Avatar key={aid} className="h-6 w-6 border-2 border-[#282e33]">
+                                <Avatar
+                                  key={aid}
+                                  className="h-6 w-6 border-2 border-[#282e33]"
+                                  title={[formatUserPrimary(aid), formatUserSecondary(aid)].filter(Boolean).join(' ')}
+                                >
                                   <AvatarFallback className="bg-[#44546f] text-white text-xs">
-                                    {getUserInitials(aid)}
+                                    {initialsForUser(aid)}
                                   </AvatarFallback>
                                 </Avatar>
                               ))}

@@ -10,7 +10,7 @@ import {
   Button,
   cn,
 } from '@taskly/ui';
-import { Plus, Check, Edit3, Trash2, X } from 'lucide-react';
+import { Plus, Check, Edit3, Trash2, X, Search } from 'lucide-react';
 
 interface Label {
   id: string;
@@ -44,6 +44,7 @@ export function LabelManagerDialog({
   onUpdateLabel,
   onDeleteLabel,
 }: LabelManagerDialogProps) {
+  const [search, setSearch] = React.useState('');
   const [isCreating, setIsCreating] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [newLabelName, setNewLabelName] = React.useState('');
@@ -73,16 +74,40 @@ export function LabelManagerDialog({
     setEditLabelColor(label.color);
   };
 
+  const filteredLabels = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return availableLabels;
+    return availableLabels.filter((l) => l.name.toLowerCase().includes(q));
+  }, [availableLabels, search]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-md">
+      <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-md p-0 overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Labels</DialogTitle>
+          <div className="px-5 pt-5">
+            <DialogTitle>Labels</DialogTitle>
+            <div className="text-xs text-[#9fadbc] mt-1">Select a label to add/remove it from the card.</div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 pb-4">
-          {/* Existing labels */}
-          {availableLabels.map((label) => {
+        <div className="px-5 pb-5">
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9fadbc]" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search labels..."
+              className="pl-10 bg-[#282e33] border-[#9fadbc29]"
+            />
+          </div>
+
+          <div className="max-h-[52vh] overflow-y-auto pr-2 pb-6 space-y-2">
+            {/* Existing labels */}
+            {filteredLabels.length === 0 ? (
+              <div className="text-center py-8 text-[#9fadbc] text-sm">No labels found</div>
+            ) : (
+              filteredLabels.map((label) => {
             const isSelected = selectedLabelIds.includes(label.id);
             const isEditing = editingId === label.id;
 
@@ -93,12 +118,15 @@ export function LabelManagerDialog({
               >
                 {isEditing ? (
                   <>
-                    <div className="flex-1 flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={editLabelColor}
-                        onChange={(e) => setEditLabelColor(e.target.value)}
-                        className="h-9 w-12 rounded cursor-pointer"
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <button
+                        type="button"
+                        className="h-9 w-16 rounded-md shrink-0 border border-[#9fadbc29] overflow-hidden"
+                        style={{ backgroundColor: editLabelColor }}
+                        onClick={() => {
+                          // no-op; color picker below
+                        }}
+                        aria-label="Label color preview"
                       />
                       <Input
                         autoFocus
@@ -108,7 +136,7 @@ export function LabelManagerDialog({
                           if (e.key === 'Enter') handleUpdate(label.id);
                           if (e.key === 'Escape') setEditingId(null);
                         }}
-                        className="flex-1"
+                        className="flex-1 bg-[#282e33] border-[#9fadbc29]"
                       />
                     </div>
                     <Button
@@ -132,7 +160,7 @@ export function LabelManagerDialog({
                     <button
                       onClick={() => onToggleLabel(label.id, isSelected)}
                       className={cn(
-                        'flex-1 flex items-center gap-3 p-2 rounded-lg border transition-all',
+                        'flex-1 flex items-center gap-3 p-2 rounded-md border transition-all bg-[#282e33] min-w-0',
                         isSelected
                           ? 'border-[#0c66e4] bg-[#0c66e4] bg-opacity-10'
                           : 'border-[#9fadbc29] hover:border-[#0c66e4]'
@@ -142,7 +170,7 @@ export function LabelManagerDialog({
                         className="h-8 w-16 rounded-md shrink-0 shadow-sm"
                         style={{ backgroundColor: label.color }}
                       />
-                      <span className="flex-1 text-left font-medium">{label.name}</span>
+                      <span className="flex-1 text-left font-medium truncate">{label.name}</span>
                       {isSelected && (
                         <Check className="h-5 w-5 text-[#0c66e4] shrink-0" />
                       )}
@@ -152,6 +180,7 @@ export function LabelManagerDialog({
                         size="sm"
                         variant="ghost"
                         onClick={() => startEdit(label)}
+                        className="h-9 w-9 p-0"
                       >
                         <Edit3 className="h-4 w-4" />
                       </Button>
@@ -159,6 +188,7 @@ export function LabelManagerDialog({
                         size="sm"
                         variant="ghost"
                         onClick={() => onDeleteLabel(label.id)}
+                        className="h-9 w-9 p-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -167,79 +197,103 @@ export function LabelManagerDialog({
                 )}
               </div>
             );
-          })}
+              })
+            )}
 
-          {/* Create new label */}
-          {isCreating ? (
-            <div className="flex items-center gap-2 p-3 rounded-lg border border-[#0c66e4] bg-[#282e33]">
-              <input
-                type="color"
-                value={newLabelColor}
-                onChange={(e) => setNewLabelColor(e.target.value)}
-                className="h-9 w-12 rounded cursor-pointer"
-              />
-              <Input
-                autoFocus
-                placeholder="Label name"
-                value={newLabelName}
-                onChange={(e) => setNewLabelName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreate();
-                  if (e.key === 'Escape') setIsCreating(false);
-                }}
-                className="flex-1"
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleCreate}
-                disabled={!newLabelName.trim()}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setIsCreating(false);
-                  setNewLabelName('');
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-sm h-10 border border-dashed border-[#9fadbc29] hover:border-[#0c66e4]"
-              onClick={() => setIsCreating(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create a new label
-            </Button>
-          )}
+            {/* Create new label */}
+            <div className="pt-4 mt-4 border-t border-[#9fadbc29]">
+              {isCreating ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-9 w-16 rounded-md border border-[#9fadbc29] shadow-sm"
+                      style={{ backgroundColor: newLabelColor }}
+                    />
+                    <Input
+                      autoFocus
+                      placeholder="New label name"
+                      value={newLabelName}
+                      onChange={(e) => setNewLabelName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreate();
+                        if (e.key === 'Escape') setIsCreating(false);
+                      }}
+                      className="flex-1 bg-[#282e33] border-[#9fadbc29]"
+                    />
+                    <Button size="sm" variant="trello" onClick={handleCreate} disabled={!newLabelName.trim()}>
+                      Create
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsCreating(false);
+                        setNewLabelName('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
 
-          {/* Color palette for quick selection */}
-          {(isCreating || editingId) && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-[#9fadbc29]">
-              {DEFAULT_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => {
-                    if (isCreating) setNewLabelColor(color);
-                    if (editingId) setEditLabelColor(color);
-                  }}
-                  className={cn(
-                    'h-8 w-8 rounded-md transition-transform hover:scale-110',
-                    (isCreating && newLabelColor === color) || (editingId && editLabelColor === color)
-                      ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1d2125]'
-                      : ''
-                  )}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+                  <div className="flex flex-wrap gap-2">
+                    {DEFAULT_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setNewLabelColor(color)}
+                        className={cn(
+                          'h-7 w-7 rounded-md transition-transform hover:scale-110',
+                          newLabelColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1d2125]' : '',
+                        )}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Select color ${color}`}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={newLabelColor}
+                      onChange={(e) => setNewLabelColor(e.target.value)}
+                      className="h-7 w-7 rounded-md cursor-pointer border border-[#9fadbc29] bg-transparent p-0"
+                      aria-label="Custom color"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-sm h-10 bg-[#282e33] border border-[#9fadbc29] hover:border-[#0c66e4]"
+                  onClick={() => setIsCreating(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create new label
+                </Button>
+              )}
+
+              {/* Color palette for edit mode */}
+              {editingId && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {DEFAULT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setEditLabelColor(color)}
+                      className={cn(
+                        'h-7 w-7 rounded-md transition-transform hover:scale-110',
+                        editLabelColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1d2125]' : '',
+                      )}
+                      style={{ backgroundColor: color }}
+                      aria-label={`Select color ${color}`}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={editLabelColor}
+                    onChange={(e) => setEditLabelColor(e.target.value)}
+                    className="h-7 w-7 rounded-md cursor-pointer border border-[#9fadbc29] bg-transparent p-0"
+                    aria-label="Custom color"
+                  />
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

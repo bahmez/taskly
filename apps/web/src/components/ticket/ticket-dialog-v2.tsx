@@ -90,6 +90,16 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const ticket = ticketQuery.data;
   const permissions = ticket?.permissions;
 
+  const commentAuthorIds = React.useMemo(() => {
+    const ids = (commentsQuery.data ?? []).map((c) => c.authorId).filter(Boolean);
+    return Array.from(new Set(ids));
+  }, [commentsQuery.data]);
+
+  const commentAuthorsQuery = api.users.byIds.useQuery(
+    { ids: commentAuthorIds },
+    { enabled: open && commentAuthorIds.length > 0 },
+  );
+
   // Assignees details
   const assigneeIds = assigneesQuery.data?.assigneeIds ?? [];
   const assigneesDetailsQuery = api.users.byIds.useQuery(
@@ -113,6 +123,48 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const workspaceMembersDetailsQuery = api.users.byIds.useQuery(
     { ids: workspaceMemberIds },
     { enabled: open && workspaceMemberIds.length > 0 }
+  );
+
+  const usersById = React.useMemo(() => {
+    const all = [
+      ...(assigneesDetailsQuery.data ?? []),
+      ...(commentAuthorsQuery.data ?? []),
+      ...(workspaceMembersDetailsQuery.data ?? []),
+    ];
+    return new Map(all.map((u) => [u.id, u]));
+  }, [assigneesDetailsQuery.data, commentAuthorsQuery.data, workspaceMembersDetailsQuery.data]);
+
+  const formatUserPrimary = React.useCallback(
+    (userId: string): string => {
+      const u = usersById.get(userId);
+      if (!u) return userId;
+      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+      if (full) return full;
+      if (u.username) return u.username;
+      return userId;
+    },
+    [usersById],
+  );
+
+  const formatUserSecondary = React.useCallback(
+    (userId: string): string => {
+      const u = usersById.get(userId);
+      if (!u) return '';
+      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+      if (u.username && full) return `@${u.username}`;
+      return '';
+    },
+    [usersById],
+  );
+
+  const initialsForUser = React.useCallback(
+    (userId: string): string => {
+      const u = usersById.get(userId);
+      if (!u) return getUserInitials(userId);
+      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+      return getUserInitials(full || u.username || userId);
+    },
+    [usersById],
   );
 
   // Mutations
@@ -311,8 +363,10 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-hidden p-0 bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
           {/* Header */}
           <div className="px-8 pt-8 pb-6 border-b border-[#9fadbc29]">
-            <div className="flex items-start gap-4">
-              <FileText className="h-6 w-6 text-[#9fadbc] mt-1 shrink-0" />
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 shrink-0 flex items-start justify-start pt-2">
+                <FileText className="h-5 w-5 text-[#9fadbc]" />
+              </div>
               <div className="flex-1 min-w-0">
                 {isEditingTitle && canEdit ? (
                   <Input
@@ -334,13 +388,13 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         setIsEditingTitle(false);
                       }
                     }}
-                    className="text-2xl font-semibold h-auto py-2"
+                    className="text-2xl font-semibold h-10 py-0"
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => canEdit && setIsEditingTitle(true)}
-                    className="text-2xl font-semibold hover:bg-[#a6c5e229] rounded px-3 py-2 -ml-3 transition-colors w-full text-left"
+                    className="text-2xl font-semibold hover:bg-[#a6c5e229] rounded px-3 h-10 -ml-3 transition-colors w-full text-left flex items-center"
                   >
                     {ticket.title}
                   </button>
@@ -645,12 +699,15 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     <div key={c.id} className="flex gap-3">
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarFallback className="bg-[#44546f] text-white text-xs">
-                          {getUserInitials(c.authorId)}
+                          {initialsForUser(c.authorId)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="text-sm font-semibold">{c.authorId}</div>
+                          <div className="text-sm font-semibold">{formatUserPrimary(c.authorId)}</div>
+                          {formatUserSecondary(c.authorId) ? (
+                            <div className="text-xs text-[#9fadbc]">{formatUserSecondary(c.authorId)}</div>
+                          ) : null}
                           <div className="text-xs text-[#9fadbc]">{new Date(c.createdAt).toLocaleString()}</div>
                         </div>
                         <div className="bg-[#282e33] border border-[#9fadbc29] rounded-lg p-3 text-sm">
@@ -792,7 +849,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     <div key={u.id} className="relative group">
                       <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 ring-[#0c66e4] transition-all">
                         <AvatarFallback className="bg-[#44546f] text-white text-xs">
-                          {getUserInitials(`${u.first_name} ${u.last_name}`)}
+                          {initialsForUser(u.id)}
                         </AvatarFallback>
                       </Avatar>
                       {canAssign && (
