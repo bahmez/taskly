@@ -22,11 +22,23 @@ export type {
   BoardColumnModel,
   BoardColumnCreateInput,
   BoardColumnUpdateInput,
+  BoardLabelModel,
+  BoardLabelCreateInput,
+  BoardLabelUpdateInput,
 } from './boards/board.model';
 export { BoardsStore } from './boards/boards.store';
 export { BoardsService } from './boards/boards.service';
 
-export type { TicketModel, TicketCreateInput, TicketUpdateInput, TicketCommentModel } from './tickets/ticket.model';
+export type {
+  TicketModel,
+  TicketCreateInput,
+  TicketUpdateInput,
+  TicketCommentModel,
+  TicketChecklistModel,
+  TicketChecklistItemModel,
+  TicketAttachmentModel,
+  TicketAttachmentStatus,
+} from './tickets/ticket.model';
 export { TicketsStore } from './tickets/tickets.store';
 export { TicketsService } from './tickets/tickets.service';
 

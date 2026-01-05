@@ -12,12 +12,25 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { FIREBASE_ADMIN_APP, FIREBASE_AUTH } from '@taskly/firebase';
 import { BoardsService, TicketsService, UsersService, WorkspacesService } from '@taskly/database';
 import type { AppRouter, Context } from '@taskly/trpc';
+import { GcsService } from './gcs/gcs.service.js';
+import crypto from 'node:crypto';
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
   const [type, token] = header.split(' ');
   if (!type || type.toLowerCase() !== 'bearer' || !token) return null;
   return token;
+}
+
+function sanitizeFilename(name: string): string {
+  const base = name.replace(/[/\\]/g, '_').trim();
+  return base.slice(0, 200) || 'file';
+}
+
+function buildObjectPath(boardId: string, ticketId: string, filename: string): string {
+  const safe = sanitizeFilename(filename);
+  const rand = crypto.randomBytes(8).toString('hex');
+  return `boards/${boardId}/tickets/${ticketId}/${rand}-${safe}`;
 }
 
 async function bootstrap() {
@@ -63,6 +76,7 @@ async function bootstrap() {
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
   const ticketsService = app.get(TicketsService);
+  const gcsService = app.get(GcsService);
 
   // Resolve + load @taskly/trpc at runtime so we can log what actually happens (race vs link issue).
   const require = createRequire(import.meta.url);
@@ -196,6 +210,12 @@ async function bootstrap() {
           deleteColumn: boardsService.deleteColumn.bind(boardsService),
           reorderColumns: boardsService.reorderColumns.bind(boardsService),
 
+          listLabels: boardsService.listLabels.bind(boardsService),
+          createLabel: boardsService.createLabel.bind(boardsService),
+          updateLabel: boardsService.updateLabel.bind(boardsService),
+          deleteLabel: boardsService.deleteLabel.bind(boardsService),
+          reorderLabels: boardsService.reorderLabels.bind(boardsService),
+
           listTickets: boardsService.listTickets.bind(boardsService),
           listTicketsByColumn: boardsService.listTicketsByColumn.bind(boardsService),
           createTicket: boardsService.createTicket.bind(boardsService),
@@ -203,7 +223,7 @@ async function bootstrap() {
           archiveTicket: boardsService.archiveTicket.bind(boardsService),
         };
 
-        const tickets = {
+        const makeTickets = (actorId: string | null) => ({
           getById: ticketsService.getById.bind(ticketsService),
           update: ticketsService.update.bind(ticketsService),
           archive: ticketsService.archive.bind(ticketsService),
@@ -216,23 +236,79 @@ async function bootstrap() {
           getAssigneeIds: ticketsService.getAssigneeIds.bind(ticketsService),
           addAssignee: ticketsService.addAssignee.bind(ticketsService),
           removeAssignee: ticketsService.removeAssignee.bind(ticketsService),
-        };
+
+          getLabelIds: ticketsService.getLabelIds.bind(ticketsService),
+          addLabel: ticketsService.addLabel.bind(ticketsService),
+          removeLabel: ticketsService.removeLabel.bind(ticketsService),
+
+          listChecklists: ticketsService.listChecklists.bind(ticketsService),
+          createChecklist: ticketsService.createChecklist.bind(ticketsService),
+          updateChecklist: ticketsService.updateChecklist.bind(ticketsService),
+          deleteChecklist: ticketsService.deleteChecklist.bind(ticketsService),
+          reorderChecklists: ticketsService.reorderChecklists.bind(ticketsService),
+
+          addChecklistItem: ticketsService.addChecklistItem.bind(ticketsService),
+          updateChecklistItem: ticketsService.updateChecklistItem.bind(ticketsService),
+          deleteChecklistItem: ticketsService.deleteChecklistItem.bind(ticketsService),
+          reorderChecklistItems: ticketsService.reorderChecklistItems.bind(ticketsService),
+
+          listAttachments: ticketsService.listAttachments.bind(ticketsService),
+          createAttachmentUpload: async (
+            ticketId: string,
+            input: { filename: string; contentType: string; resumable?: boolean },
+          ) => {
+            if (!actorId) throw new Error('Unauthorized');
+
+            const t = await ticketsService.getById(ticketId);
+            if (!t) throw new Error('Ticket not found');
+
+            const filename = sanitizeFilename(input.filename);
+            const contentType = input.contentType.trim() || 'application/octet-stream';
+            const objectPath = buildObjectPath(t.boardId, ticketId, filename);
+
+            const attachment = await ticketsService.createAttachmentRecord(ticketId, {
+              createdBy: actorId,
+              filename,
+              contentType,
+              objectPath,
+            });
+
+            const upload = await gcsService.signedUploadUrl({
+              objectPath,
+              contentType,
+              resumable: input.resumable ?? true,
+            });
+            return { attachment, upload };
+          },
+          completeAttachment: ticketsService.completeAttachment.bind(ticketsService),
+          getAttachmentDownload: async (ticketId: string, attachmentId: string) => {
+            const att = await ticketsService.getAttachment(ticketId, attachmentId);
+            if (!att) throw new Error('Attachment not found');
+            if (att.status !== 'uploaded') throw new Error('Attachment not uploaded yet');
+            const download = await gcsService.signedDownloadUrl({ objectPath: att.objectPath });
+            return { attachment: att, download };
+          },
+          removeAttachment: async (ticketId: string, attachmentId: string) => {
+            const att = await ticketsService.deleteAttachmentRecord(ticketId, attachmentId);
+            if (att) await gcsService.deleteObject(att.objectPath);
+          },
+        });
 
         if (!token) {
-          return { user: null, users, workspaces, boards, tickets };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null) };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards, tickets };
+          return { user, users, workspaces, boards, tickets: makeTickets(user.id) };
         } catch (e) {
           if (process.env.NODE_ENV !== 'production') {
             const err = e as { message?: string; code?: string };
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
-          return { user: null, users, workspaces, boards, tickets };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null) };
         }
       },
     }),

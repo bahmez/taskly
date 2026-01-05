@@ -20,6 +20,9 @@ type CreateColumnDto = { title?: string; key?: string };
 type PatchColumnDto = { title?: string; key?: string };
 type ReorderColumnsDto = { columnIds?: string[] };
 type MoveTicketDto = { columnId?: string; position?: number };
+type CreateLabelDto = { name?: string; color?: string | null };
+type PatchLabelDto = { name?: string; color?: string | null };
+type ReorderLabelsDto = { labelIds?: string[] };
 
 @UseGuards(FirebaseAuthGuard)
 @Controller('/api/boards')
@@ -171,6 +174,99 @@ export class BoardController {
     return { ok: true };
   }
 
+  // Labels
+  @Get('/:boardId/labels')
+  async listLabels(@CurrentUser() user: UserModel, @Param('boardId') boardId: string) {
+    const board = await this.access.getBoardOrThrow(boardId);
+    const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
+    this.access.requirePermission(role, 'board.meta.read');
+    return await this.boards.listLabels(boardId);
+  }
+
+  @Post('/:boardId/labels')
+  async createLabel(@CurrentUser() user: UserModel, @Param('boardId') boardId: string, @Body() body: CreateLabelDto) {
+    const board = await this.access.getBoardOrThrow(boardId);
+    const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
+    this.access.requirePermission(role, 'board.meta.write');
+
+    const name = (body.name ?? '').trim();
+    if (!name) throw new BadRequestException('name is required');
+
+    let color: string | null | undefined = body.color;
+    if (typeof color === 'string') {
+      const c = color.trim();
+      if (c) {
+        const hex = c.startsWith('#') ? c.slice(1) : c;
+        if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new BadRequestException('color must be a 6-digit hex code');
+        color = `#${hex.toUpperCase()}`;
+      } else {
+        color = undefined;
+      }
+    }
+
+    return await this.boards.createLabel(boardId, { name, color });
+  }
+
+  @Patch('/:boardId/labels/order')
+  async reorderLabels(
+    @CurrentUser() user: UserModel,
+    @Param('boardId') boardId: string,
+    @Body() body: ReorderLabelsDto,
+  ) {
+    const board = await this.access.getBoardOrThrow(boardId);
+    const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
+    this.access.requirePermission(role, 'board.meta.write');
+
+    const labelIds = body.labelIds ?? [];
+    if (!Array.isArray(labelIds) || labelIds.length === 0) throw new BadRequestException('labelIds is required');
+    if (new Set(labelIds).size !== labelIds.length) throw new BadRequestException('labelIds must be unique');
+
+    try {
+      await this.boards.reorderLabels(boardId, labelIds);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+    return { ok: true };
+  }
+
+  @Patch('/:boardId/labels/:labelId')
+  async patchLabel(
+    @CurrentUser() user: UserModel,
+    @Param('boardId') boardId: string,
+    @Param('labelId') labelId: string,
+    @Body() body: PatchLabelDto,
+  ) {
+    const board = await this.access.getBoardOrThrow(boardId);
+    const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
+    this.access.requirePermission(role, 'board.meta.write');
+
+    const patch: { name?: string; color?: string } = {};
+    if (typeof body.name === 'string') {
+      const n = body.name.trim();
+      if (!n) throw new BadRequestException('name cannot be empty');
+      patch.name = n;
+    }
+    if (body.color === null || typeof body.color === 'string') {
+      const c = (body.color ?? '').trim();
+      if (!c) throw new BadRequestException('color cannot be empty (omit it to keep unchanged)');
+      const hex = c.startsWith('#') ? c.slice(1) : c;
+      if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new BadRequestException('color must be a 6-digit hex code');
+      patch.color = `#${hex.toUpperCase()}`;
+    }
+    if (Object.keys(patch).length === 0) throw new BadRequestException('Nothing to update');
+
+    return await this.boards.updateLabel(boardId, labelId, patch);
+  }
+
+  @Delete('/:boardId/labels/:labelId')
+  async deleteLabel(@CurrentUser() user: UserModel, @Param('boardId') boardId: string, @Param('labelId') labelId: string) {
+    const board = await this.access.getBoardOrThrow(boardId);
+    const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
+    this.access.requirePermission(role, 'board.meta.write');
+    await this.boards.deleteLabel(boardId, labelId);
+    return { ok: true };
+  }
+
   // Tickets
   @Get('/:boardId/tickets')
   async listTickets(@CurrentUser() user: UserModel, @Param('boardId') boardId: string) {
@@ -186,6 +282,7 @@ export class BoardController {
       columnId: t.columnId,
       title: t.title,
       description: canReadContent ? t.description : undefined,
+      labelIds: t.labelIds,
       position: t.position,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
@@ -210,6 +307,7 @@ export class BoardController {
       columnId: t.columnId,
       title: t.title,
       description: canReadContent ? t.description : undefined,
+      labelIds: t.labelIds,
       position: t.position,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
