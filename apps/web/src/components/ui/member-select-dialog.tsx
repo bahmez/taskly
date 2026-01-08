@@ -55,8 +55,8 @@ export function MemberSelectDialog({
     return members.filter(
       (m) =>
         m.username.toLowerCase().includes(q) ||
-        m.first_name.toLowerCase().includes(q) ||
-        m.last_name.toLowerCase().includes(q)
+        (m.first_name ?? '').toLowerCase().includes(q) ||
+        (m.last_name ?? '').toLowerCase().includes(q)
     );
   }, [members, search]);
 

@@ -12,7 +12,7 @@ const BOARDS_PER_PAGE = 12;
 export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
   const utils = api.useUtils();
-  const { workspaces, setSelectedWorkspaceId } = useWorkspaceUI();
+  const { setSelectedWorkspaceId } = useWorkspaceUI();
 
   React.useEffect(() => {
     setSelectedWorkspaceId(workspaceId);

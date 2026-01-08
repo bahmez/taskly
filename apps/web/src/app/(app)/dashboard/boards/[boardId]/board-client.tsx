@@ -14,12 +14,11 @@ import {
   Textarea,
   Avatar,
   AvatarFallback,
-  Badge,
   cn,
   useToast,
 } from '@taskly/ui';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
-import { MoreHorizontal, Plus, Tag, CheckSquare, Paperclip, MessageSquare } from 'lucide-react';
+import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare } from 'lucide-react';
 import TicketDialogV2 from '@/components/ticket/ticket-dialog-v2';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -33,6 +32,12 @@ function getUserInitials(name?: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0]![0] + parts[1]![0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
+}
+
+function getOptionalStringProp(obj: unknown, key: string): string | undefined {
+  if (!obj || typeof obj !== 'object') return undefined;
+  const v = (obj as Record<string, unknown>)[key];
+  return typeof v === 'string' ? v : undefined;
 }
 
 export default function BoardClient({ boardId }: { boardId: string }) {
@@ -114,17 +119,12 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     onConfirm: () => {},
   });
 
-  if (viewQuery.isLoading) {
-    return <div className="p-6 text-[#b6c2cf]">Loading…</div>;
-  }
-  if (!viewQuery.data) {
-    return <div className="p-6 text-[#b6c2cf]">Board not found.</div>;
-  }
-
-  const { board, columns, tickets } = viewQuery.data;
+  const board = viewQuery.data?.board;
+  const columns = React.useMemo(() => viewQuery.data?.columns ?? [], [viewQuery.data?.columns]);
+  const tickets = React.useMemo(() => viewQuery.data?.tickets ?? [], [viewQuery.data?.tickets]);
   const boardLabels = labelsQuery.data ?? [];
 
-  const allAssigneeIds = React.useMemo(() => {
+  const allAssigneeIds = React.useMemo<string[]>(() => {
     const ids = tickets.flatMap((t) => t.assigneeIds ?? []);
     return Array.from(new Set(ids));
   }, [tickets]);
@@ -142,11 +142,14 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     (userId: string): string => {
       const u = usersById.get(userId);
       if (!u) return userId;
-      const displayName = (u as any)?.displayName ?? (u as any)?.display_name;
+      const displayName = getOptionalStringProp(u, 'displayName') ?? getOptionalStringProp(u, 'display_name');
       if (typeof displayName === 'string' && displayName.trim()) return displayName.trim();
-      const full = `${(u as any)?.first_name ?? ''} ${(u as any)?.last_name ?? ''}`.trim();
+      const first = getOptionalStringProp(u, 'first_name') ?? '';
+      const last = getOptionalStringProp(u, 'last_name') ?? '';
+      const full = `${first} ${last}`.trim();
       if (full) return full;
-      if ((u as any)?.username) return String((u as any).username);
+      const username = getOptionalStringProp(u, 'username');
+      if (username) return username;
       return userId;
     },
     [usersById],
@@ -154,10 +157,13 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
   const formatUserSecondary = React.useCallback(
     (userId: string): string => {
-      const u = usersById.get(userId) as any;
+      const u = usersById.get(userId);
       if (!u) return '';
-      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
-      if (u.username && full) return `@${u.username}`;
+      const first = getOptionalStringProp(u, 'first_name') ?? '';
+      const last = getOptionalStringProp(u, 'last_name') ?? '';
+      const full = `${first} ${last}`.trim();
+      const username = getOptionalStringProp(u, 'username');
+      if (username && full) return `@${username}`;
       return '';
     },
     [usersById],
@@ -165,15 +171,25 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
   const initialsForUser = React.useCallback(
     (userId: string): string => {
-      const u = usersById.get(userId) as any;
+      const u = usersById.get(userId);
       if (!u) return getUserInitials(userId);
-      const displayName = u?.displayName ?? u?.display_name;
+      const displayName = getOptionalStringProp(u, 'displayName') ?? getOptionalStringProp(u, 'display_name');
       if (typeof displayName === 'string' && displayName.trim()) return getUserInitials(displayName.trim());
-      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
-      return getUserInitials(full || u.username || userId);
+      const first = getOptionalStringProp(u, 'first_name') ?? '';
+      const last = getOptionalStringProp(u, 'last_name') ?? '';
+      const full = `${first} ${last}`.trim();
+      const username = getOptionalStringProp(u, 'username');
+      return getUserInitials(full || username || userId);
     },
     [usersById],
   );
+
+  if (viewQuery.isLoading) {
+    return <div className="p-6 text-[#b6c2cf]">Loading…</div>;
+  }
+  if (!viewQuery.data || !board) {
+    return <div className="p-6 text-[#b6c2cf]">Board not found.</div>;
+  }
 
   const ticketsByColumn = new Map<string, typeof tickets>();
   for (const c of columns) ticketsByColumn.set(c.id, []);

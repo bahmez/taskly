@@ -75,12 +75,12 @@ export function Navbar() {
     setFirstName(me.first_name ?? "")
     setLastName(me.last_name ?? "")
     setDescription(me.description ?? "")
-  }, [meQuery.data?.id])
+  }, [meQuery.data])
 
   React.useEffect(() => {
     setDisplayName(firebaseUser?.displayName ?? "")
     setPhotoURL(firebaseUser?.photoURL ?? "")
-  }, [firebaseUser?.uid])
+  }, [firebaseUser?.uid, firebaseUser?.displayName, firebaseUser?.photoURL])
 
   const goToWorkspace = (workspaceId: string) => {
     setSelectedWorkspaceId(workspaceId)

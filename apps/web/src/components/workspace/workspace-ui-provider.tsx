@@ -14,7 +14,7 @@ const WorkspaceUIContext = createContext<WorkspaceUIContextValue | null>(null);
 
 export function WorkspaceUIProvider({ children }: { children: React.ReactNode }) {
   const workspacesQuery = api.workspaces.list.useQuery({ archived: false });
-  const workspaces = workspacesQuery.data ?? [];
+  const workspaces = useMemo(() => workspacesQuery.data ?? [], [workspacesQuery.data]);
 
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
 

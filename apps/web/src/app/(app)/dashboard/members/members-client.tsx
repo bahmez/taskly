@@ -31,14 +31,12 @@ function trpcErrorMessage(err: unknown): string {
 }
 
 function MemberRow({
-  workspaceId,
   member,
   membersCount,
   adminsCount,
   onUpdateRole,
   onRemove,
 }: {
-  workspaceId: string;
   member: { userId: string; role: Role };
   membersCount: number;
   adminsCount: number;
@@ -367,7 +365,6 @@ export default function MembersClient() {
                 members.map((m) => (
                   <MemberRow
                     key={m.userId}
-                    workspaceId={workspaceId}
                     membersCount={membersCount}
                     adminsCount={adminsCount}
                     member={{ userId: m.userId, role: m.role as Role }}
