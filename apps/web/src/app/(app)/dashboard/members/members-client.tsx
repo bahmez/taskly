@@ -52,7 +52,9 @@ function MemberRow({
     },
   );
 
-  const label = uq.data?.username ?? member.userId;
+  const fullName = `${uq.data?.first_name ?? ''} ${uq.data?.last_name ?? ''}`.trim();
+  const label = fullName || uq.data?.username || member.userId;
+  const secondary = uq.data?.username && fullName ? `@${uq.data.username}` : '';
   const isLastMember = membersCount <= 1;
   const isLastAdmin = member.role === 'admin' && adminsCount <= 1;
   const cannotRemove = isLastMember || isLastAdmin;
@@ -61,7 +63,7 @@ function MemberRow({
     <div className="flex items-center justify-between gap-3 rounded-md border border-[#9fadbc29] p-3">
       <div className="min-w-0">
         <div className="text-sm font-medium truncate">{label}</div>
-        <div className="text-xs text-[#9fadbc] truncate">{member.userId}</div>
+        {secondary ? <div className="text-xs text-[#9fadbc] truncate">{secondary}</div> : null}
       </div>
 
       <div className="flex items-center gap-2">

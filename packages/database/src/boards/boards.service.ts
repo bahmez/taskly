@@ -4,6 +4,9 @@ import type {
   BoardColumnModel,
   BoardColumnUpdateInput,
   BoardCreateInput,
+  BoardLabelCreateInput,
+  BoardLabelModel,
+  BoardLabelUpdateInput,
   BoardModel,
   BoardUpdateInput,
 } from './board.model';
@@ -56,6 +59,27 @@ export class BoardsService {
 
   reorderColumns(boardId: string, columnIds: string[]): Promise<void> {
     return this.store.reorderColumns(boardId, columnIds);
+  }
+
+  // Labels
+  listLabels(boardId: string): Promise<BoardLabelModel[]> {
+    return this.store.listLabels(boardId);
+  }
+
+  createLabel(boardId: string, input: BoardLabelCreateInput): Promise<BoardLabelModel> {
+    return this.store.createLabel(boardId, input);
+  }
+
+  updateLabel(boardId: string, labelId: string, patch: BoardLabelUpdateInput): Promise<BoardLabelModel> {
+    return this.store.updateLabel(boardId, labelId, patch);
+  }
+
+  deleteLabel(boardId: string, labelId: string): Promise<void> {
+    return this.store.deleteLabel(boardId, labelId);
+  }
+
+  reorderLabels(boardId: string, labelIds: string[]): Promise<void> {
+    return this.store.reorderLabels(boardId, labelIds);
   }
 
   listTickets(boardId: string): Promise<TicketModel[]> {

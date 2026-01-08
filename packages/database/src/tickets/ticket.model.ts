@@ -6,6 +6,7 @@ export type TicketModel = {
   description: string;
   dueDate: string | null;
   assigneeIds: string[];
+  labelIds: string[];
   position: number;
   isArchived: boolean;
   archivedAt: string | null;
@@ -28,6 +29,42 @@ export type TicketCommentModel = {
   ticketId: string;
   authorId: string;
   content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketChecklistItemModel = {
+  id: string;
+  ticketId: string;
+  checklistId: string;
+  content: string;
+  isDone: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketChecklistModel = {
+  id: string;
+  ticketId: string;
+  title: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+  items: TicketChecklistItemModel[];
+};
+
+export type TicketAttachmentStatus = 'pending' | 'uploaded';
+
+export type TicketAttachmentModel = {
+  id: string;
+  ticketId: string;
+  createdBy: string;
+  filename: string;
+  contentType: string;
+  objectPath: string;
+  status: TicketAttachmentStatus;
+  size: number | null;
   createdAt: string;
   updatedAt: string;
 };
