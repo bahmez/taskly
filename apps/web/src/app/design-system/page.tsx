@@ -10,7 +10,6 @@ import {
   Textarea,
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -28,7 +27,7 @@ import {
   useToast,
   Toaster
 } from "@taskly/ui";
-import { Plus, MoreHorizontal, Calendar, Paperclip, AlignLeft, CheckSquare, Bell } from "lucide-react";
+import { Plus, MoreHorizontal, Calendar, Paperclip, AlignLeft, CheckSquare } from "lucide-react";
 import { useState } from "react";
 import TrelloLayout from "@/components/layout/trello-layout";
 

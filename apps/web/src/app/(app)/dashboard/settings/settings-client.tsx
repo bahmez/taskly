@@ -50,7 +50,7 @@ export default function SettingsClient() {
     if (!wsQuery.data) return;
     setTitle(wsQuery.data.title ?? '');
     setDescription(wsQuery.data.description ?? '');
-  }, [wsQuery.data?.id]);
+  }, [wsQuery.data]);
 
   if (!workspaceId) {
     return (

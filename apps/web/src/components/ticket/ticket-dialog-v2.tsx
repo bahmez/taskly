@@ -28,7 +28,6 @@ import {
   Trash2,
   Plus,
   Edit3,
-  Eye,
   FileText,
 } from 'lucide-react';
 import { ConfirmDialog } from '../ui/confirm-dialog';
@@ -44,6 +43,12 @@ interface TicketDialogProps {
   onOpenChange: (open: boolean) => void;
   ticketId: string;
   boardId: string;
+}
+
+function trpcErrorMessage(err: unknown): string {
+  if (!err || typeof err !== 'object') return 'Action failed';
+  const msg = (err as Record<string, unknown>).message;
+  return typeof msg === 'string' && msg.trim() ? msg : 'Action failed';
 }
 
 function getUserInitials(name?: string): string {
@@ -177,7 +182,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       toast({ title: 'Ticket updated' });
     },
     onError: (e) => {
-      toast({ title: 'Update failed', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Update failed', description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -198,7 +203,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       toast({ title: 'Member added' });
     },
     onError: (e) => {
-      toast({ title: 'Failed to add member', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Failed to add member', description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -241,7 +246,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       addLabel.mutate({ ticketId, labelId: newLabel.id });
     },
     onError: (e) => {
-      toast({ title: 'Failed to create label', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Failed to create label', description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -251,7 +256,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       toast({ title: 'Label updated' });
     },
     onError: (e) => {
-      toast({ title: 'Failed to update label', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Failed to update label', description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -265,7 +270,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       toast({ title: 'Label deleted' });
     },
     onError: (e) => {
-      toast({ title: 'Failed to delete label', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Failed to delete label', description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -573,7 +578,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           {canEdit && (
                             <div className="mt-3 flex gap-2">
                               <Input
-                                size="sm"
                                 placeholder="Add an item..."
                                 value={newChecklistItemContent[cl.id] ?? ''}
                                 onChange={(e) =>
