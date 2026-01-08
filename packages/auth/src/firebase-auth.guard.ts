@@ -23,7 +23,7 @@ function extractBearerToken(req: Request): string | null {
 export class FirebaseAuthGuard implements CanActivate {
   constructor(
     @Inject(FIREBASE_AUTH) private readonly auth: Auth,
-    private readonly users: UsersService,
+    @Inject(UsersService) private readonly users: UsersService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,7 +40,12 @@ export class FirebaseAuthGuard implements CanActivate {
       };
       (req as unknown as Request & Partial<AuthenticatedRequest>).user = user;
       return true;
-    } catch {
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') {
+        const err = e as { message?: string; code?: string };
+        // eslint-disable-next-line no-console
+        console.warn('[auth] verifyIdToken failed', { code: err?.code, message: err?.message });
+      }
       throw new UnauthorizedException('Invalid token');
     }
   }

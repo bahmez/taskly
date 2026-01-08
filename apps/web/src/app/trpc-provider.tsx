@@ -5,6 +5,7 @@ import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import { useState } from 'react';
 import { api } from './trpc';
+import { getFirebaseAuth } from '@/lib/firebase/firebase-client';
 
 function getBaseUrl() {
   // Browser -> env public
@@ -21,6 +22,11 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         httpBatchLink({
           url: `${getBaseUrl()}/trpc`,
           transformer: superjson,
+          headers: async () => {
+            const auth = getFirebaseAuth();
+            const token = await auth?.currentUser?.getIdToken();
+            return token ? { Authorization: `Bearer ${token}` } : {};
+          },
         }),
       ],
     }),

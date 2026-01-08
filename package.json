@@ -22,7 +22,11 @@
     "rimraf": "^6.0.1",
     "turbo": "^2.0.12",
     "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@mdxeditor/editor": "^3.52.3",
+    "@uiw/react-md-editor": "^4.0.11",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.1"
   }
 }
-
-

@@ -12,3 +12,5 @@ export * from "./components/ui/dropdown-menu";
 export * from "./components/ui/layout";
 export * from "./components/ui/separator";
 export * from "./components/ui/collapsible";
+export * from "./components/ui/avatar";
+export * from "./components/ui/badge";

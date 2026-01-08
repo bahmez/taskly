@@ -37,4 +37,21 @@ export type BoardColumnCreateInput = {
 
 export type BoardColumnUpdateInput = Partial<Pick<BoardColumnModel, 'title' | 'key'>>;
 
+export type BoardLabelModel = {
+  id: string;
+  boardId: string;
+  name: string;
+  color: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BoardLabelCreateInput = {
+  name: string;
+  color?: string | null;
+};
+
+export type BoardLabelUpdateInput = Partial<Pick<BoardLabelModel, 'name' | 'color'>>;
+
 

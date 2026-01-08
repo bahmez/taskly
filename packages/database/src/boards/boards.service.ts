@@ -1,18 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type {
   BoardColumnCreateInput,
   BoardColumnModel,
   BoardColumnUpdateInput,
   BoardCreateInput,
+  BoardLabelCreateInput,
+  BoardLabelModel,
+  BoardLabelUpdateInput,
   BoardModel,
   BoardUpdateInput,
 } from './board.model';
-import type { TicketModel } from '../tickets/ticket.model';
+import type { TicketCreateInput, TicketModel } from '../tickets/ticket.model';
 import { BoardsStore } from './boards.store';
 
 @Injectable()
 export class BoardsService {
-  constructor(private readonly store: BoardsStore) {}
+  constructor(@Inject(BoardsStore) private readonly store: BoardsStore) {}
 
   createBoard(input: BoardCreateInput): Promise<BoardModel> {
     return this.store.createBoard(input);
@@ -58,12 +61,37 @@ export class BoardsService {
     return this.store.reorderColumns(boardId, columnIds);
   }
 
+  // Labels
+  listLabels(boardId: string): Promise<BoardLabelModel[]> {
+    return this.store.listLabels(boardId);
+  }
+
+  createLabel(boardId: string, input: BoardLabelCreateInput): Promise<BoardLabelModel> {
+    return this.store.createLabel(boardId, input);
+  }
+
+  updateLabel(boardId: string, labelId: string, patch: BoardLabelUpdateInput): Promise<BoardLabelModel> {
+    return this.store.updateLabel(boardId, labelId, patch);
+  }
+
+  deleteLabel(boardId: string, labelId: string): Promise<void> {
+    return this.store.deleteLabel(boardId, labelId);
+  }
+
+  reorderLabels(boardId: string, labelIds: string[]): Promise<void> {
+    return this.store.reorderLabels(boardId, labelIds);
+  }
+
   listTickets(boardId: string): Promise<TicketModel[]> {
     return this.store.listTickets(boardId);
   }
 
   listTicketsByColumn(boardId: string, columnId: string): Promise<TicketModel[]> {
     return this.store.listTicketsByColumn(boardId, columnId);
+  }
+
+  createTicket(boardId: string, input: TicketCreateInput): Promise<TicketModel> {
+    return this.store.createTicket(boardId, input);
   }
 
   moveTicket(boardId: string, ticketId: string, input: { columnId: string; position: number }): Promise<void> {

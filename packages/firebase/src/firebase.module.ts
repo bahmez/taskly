@@ -21,10 +21,42 @@ function initFirebaseAdminApp(options?: FirebaseModuleOptions): admin.app.App {
 
   const serviceAccountJson =
     options?.serviceAccountJson ?? process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  const projectId = options?.projectId ?? process.env.FIREBASE_PROJECT_ID;
+  // Try to infer projectId from multiple sources to reduce local dev friction.
+  // - explicit option
+  // - backend env (preferred)
+  // - common GCP envs
+  // - service account json "project_id"
+  // - web env (last resort, useful for local dev)
+  let inferredProjectId: string | undefined;
+  let parsedServiceAccount: unknown = undefined;
+  if (serviceAccountJson) {
+    try {
+      parsedServiceAccount = JSON.parse(serviceAccountJson) as unknown;
+      inferredProjectId = (parsedServiceAccount as { project_id?: unknown })?.project_id as
+        | string
+        | undefined;
+    } catch {
+      // ignore parse errors here; credential.cert will throw with a clearer message later
+    }
+  }
+
+  const projectId =
+    options?.projectId ??
+    process.env.FIREBASE_PROJECT_ID ??
+    process.env.GOOGLE_CLOUD_PROJECT ??
+    process.env.GCLOUD_PROJECT ??
+    inferredProjectId ??
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+  if (!projectId && process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[firebase-admin] Missing projectId (FIREBASE_PROJECT_ID). verifyIdToken may fail with "incorrect aud/iss".',
+    );
+  }
 
   const credential = serviceAccountJson
-    ? admin.credential.cert(JSON.parse(serviceAccountJson))
+    ? admin.credential.cert((parsedServiceAccount ?? JSON.parse(serviceAccountJson)) as object)
     : admin.credential.applicationDefault();
 
   return admin.initializeApp({

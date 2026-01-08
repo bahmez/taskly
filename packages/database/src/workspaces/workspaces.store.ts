@@ -83,6 +83,15 @@ export class WorkspacesStore {
     });
   }
 
+  async unarchiveWorkspace(workspaceId: string): Promise<void> {
+    const now = nowIso();
+    await this.workspaceRef(workspaceId).update({
+      isArchived: false,
+      archivedAt: null,
+      updatedAt: now,
+    });
+  }
+
   async getMember(
     workspaceId: string,
     userId: string,
@@ -138,23 +147,81 @@ export class WorkspacesStore {
   }
 
   async listWorkspacesForUser(userId: string): Promise<WorkspaceModel[]> {
-    const memberships = await this.db
-      .collectionGroup('members')
-      .where('userId', '==', userId)
-      .get();
+    try {
+      const memberships = await this.db
+        .collectionGroup('members')
+        .where('userId', '==', userId)
+        .get();
 
-    const workspaceRefs = memberships.docs
-      .map((m) => m.ref.parent.parent)
-      .filter(Boolean);
+      const workspaceRefs = memberships.docs
+        .map((m) => m.ref.parent.parent)
+        .filter(Boolean);
 
-    const snaps = await Promise.all(workspaceRefs.map((r) => r!.get()));
-    const workspaces: WorkspaceModel[] = [];
-    for (const snap of snaps) {
-      if (!snap.exists) continue;
-      const data = snap.data() as WorkspaceDoc;
-      workspaces.push({ id: snap.id, ...data });
+      const snaps = await Promise.all(workspaceRefs.map((r) => r!.get()));
+      const workspaces: WorkspaceModel[] = [];
+      for (const snap of snaps) {
+        if (!snap.exists) continue;
+        const data = snap.data() as WorkspaceDoc;
+        workspaces.push({ id: snap.id, ...data });
+      }
+      return workspaces.filter((w) => !w.isArchived);
+    } catch (e) {
+      // Some Firestore setups (notably certain project/database modes) may reject collectionGroup queries
+      // with a FAILED_PRECONDITION (code 9) without details. Fallback to an MVP-friendly approach.
+      const err = e as { code?: number | string; message?: string };
+      const code = typeof err?.code === 'string' ? Number(err.code) : err?.code;
+      if (code !== 9) throw e;
+
+      const snap = await this.workspacesCol().where('isArchived', '==', false).limit(200).get();
+      const candidates = snap.docs.map((d) => ({ id: d.id, ...(d.data() as WorkspaceDoc) }));
+
+      const checks = await Promise.all(
+        candidates.map(async (w) => {
+          const m = await this.membersCol(w.id).doc(userId).get();
+          return m.exists ? w : null;
+        }),
+      );
+
+      return checks.filter((x): x is WorkspaceModel => Boolean(x));
     }
-    return workspaces.filter((w) => !w.isArchived);
+  }
+
+  async listArchivedWorkspacesForUser(userId: string): Promise<WorkspaceModel[]> {
+    try {
+      const memberships = await this.db
+        .collectionGroup('members')
+        .where('userId', '==', userId)
+        .get();
+
+      const workspaceRefs = memberships.docs
+        .map((m) => m.ref.parent.parent)
+        .filter(Boolean);
+
+      const snaps = await Promise.all(workspaceRefs.map((r) => r!.get()));
+      const workspaces: WorkspaceModel[] = [];
+      for (const snap of snaps) {
+        if (!snap.exists) continue;
+        const data = snap.data() as WorkspaceDoc;
+        workspaces.push({ id: snap.id, ...data });
+      }
+      return workspaces.filter((w) => w.isArchived);
+    } catch (e) {
+      const err = e as { code?: number | string; message?: string };
+      const code = typeof err?.code === 'string' ? Number(err.code) : err?.code;
+      if (code !== 9) throw e;
+
+      const snap = await this.workspacesCol().where('isArchived', '==', true).limit(200).get();
+      const candidates = snap.docs.map((d) => ({ id: d.id, ...(d.data() as WorkspaceDoc) }));
+
+      const checks = await Promise.all(
+        candidates.map(async (w) => {
+          const m = await this.membersCol(w.id).doc(userId).get();
+          return m.exists ? w : null;
+        }),
+      );
+
+      return checks.filter((x): x is WorkspaceModel => Boolean(x));
+    }
   }
 
   async createInvitation(

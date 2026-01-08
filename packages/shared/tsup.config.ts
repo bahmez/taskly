@@ -5,7 +5,8 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: true,
   sourcemap: true,
-  clean: true,
+  // Prevent "dist/" from disappearing during `tsup --watch` startup (it breaks ESM consumers like @taskly/api).
+  clean: !process.argv.includes('--watch'),
 });
 
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { UserModel, UserUpdateInput } from './user.model';
 import { UsersStore } from './users.store';
 
@@ -31,7 +31,7 @@ function deriveUsername(token: FirebaseIdTokenLike): string {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly users: UsersStore) {}
+  constructor(@Inject(UsersStore) private readonly users: UsersStore) {}
 
   async ensureUserExists(token: FirebaseIdTokenLike): Promise<UserModel> {
     const existing = await this.users.getById(token.uid);
