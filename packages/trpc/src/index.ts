@@ -283,12 +283,51 @@ export type TicketsContext = {
   removeAttachment: (ticketId: string, attachmentId: string) => Promise<void>;
 };
 
+export type NotificationType =
+  | 'workspace_member_added'
+  | 'workspace_member_role_updated'
+  | 'workspace_member_removed'
+  | 'workspace_invitation_accepted'
+  | 'workspace_invitation_declined'
+  | 'ticket_assigned'
+  | 'ticket_unassigned'
+  | 'ticket_comment_added'
+  | 'ticket_attachment_uploaded';
+
+export type Notification = {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  data: Record<string, unknown>;
+  actorId: string | null;
+  createdAt: string;
+  createdAtMs: number;
+  readAt: string | null;
+};
+
+export type NotificationsContext = {
+  create: (
+    userId: string,
+    input: { type: NotificationType; title: string; body?: string | null; data?: Record<string, unknown>; actorId?: string | null },
+  ) => Promise<Notification>;
+  list: (
+    userId: string,
+    input: { limit: number; cursor?: string | null; unreadOnly?: boolean },
+  ) => Promise<{ items: Notification[]; nextCursor: string | null }>;
+  countUnread: (userId: string) => Promise<number>;
+  markRead: (userId: string, notificationId: string) => Promise<void>;
+  markAllRead: (userId: string) => Promise<void>;
+};
+
 export type Context = {
   user: User | null;
   users: UsersContext;
   workspaces: WorkspacesContext;
   boards: BoardsContext;
   tickets: TicketsContext;
+  notifications: NotificationsContext;
 };
 
 const t = initTRPC.context<Context>().create({
@@ -303,6 +342,14 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   }
   return next();
 });
+
+async function safeNotify(p: Promise<unknown>): Promise<void> {
+  try {
+    await p;
+  } catch {
+    // Best-effort: never fail the main action because of a notification write.
+  }
+}
 
 function asRole(x: unknown): WorkspaceRole | null {
   if (x === 'admin' || x === 'maintainer' || x === 'editor' || x === 'viewer') return x;
@@ -417,6 +464,40 @@ export const appRouter = router({
       const text = input?.text ?? 'monorepo';
       return { message: `Bonjour ${text} — tRPC OK` };
     }),
+  notifications: router({
+    list: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().int().min(1).max(50).default(20),
+          cursor: z.string().min(1).nullable().optional(),
+          unreadOnly: z.boolean().optional(),
+        }),
+      )
+      .query(({ ctx, input }) =>
+        ctx.notifications.list(ctx.user!.id, {
+          limit: input.limit,
+          cursor: input.cursor ?? null,
+          unreadOnly: input.unreadOnly ?? false,
+        }),
+      ),
+
+    unreadCount: protectedProcedure.query(async ({ ctx }) => {
+      const count = await ctx.notifications.countUnread(ctx.user!.id);
+      return { count };
+    }),
+
+    markRead: protectedProcedure
+      .input(z.object({ id: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        await ctx.notifications.markRead(ctx.user!.id, input.id);
+        return { ok: true };
+      }),
+
+    markAllRead: protectedProcedure.mutation(async ({ ctx }) => {
+      await ctx.notifications.markAllRead(ctx.user!.id);
+      return { ok: true };
+    }),
+  }),
   users: router({
     me: protectedProcedure.query(({ ctx }) => ctx.user),
 
@@ -551,7 +632,7 @@ export const appRouter = router({
           }),
         )
         .mutation(async ({ ctx, input }) => {
-          const { role: actorRole } = await requireWorkspacePermission(
+          const { role: actorRole, workspace } = await requireWorkspacePermission(
             ctx,
             input.workspaceId,
             'workspace.members.write',
@@ -562,7 +643,19 @@ export const appRouter = router({
           }
           const exists = await ctx.users.getById(input.userId);
           if (!exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
-          return await ctx.workspaces.upsertMember(input.workspaceId, input.userId, role);
+          const member = await ctx.workspaces.upsertMember(input.workspaceId, input.userId, role);
+          if (input.userId !== ctx.user!.id) {
+            await safeNotify(
+              ctx.notifications.create(input.userId, {
+                type: 'workspace_member_added',
+                title: `Vous avez été ajouté au workspace "${workspace.title}"`,
+                body: `Rôle: ${role}`,
+                actorId: ctx.user!.id,
+                data: { workspaceId: workspace.id, role },
+              }),
+            );
+          }
+          return member;
         }),
 
       updateRole: protectedProcedure
@@ -574,7 +667,7 @@ export const appRouter = router({
           }),
         )
         .mutation(async ({ ctx, input }) => {
-          const { role: actorRole } = await requireWorkspacePermission(
+          const { role: actorRole, workspace } = await requireWorkspacePermission(
             ctx,
             input.workspaceId,
             'workspace.members.write',
@@ -594,13 +687,25 @@ export const appRouter = router({
             }
           }
 
-          return await ctx.workspaces.upsertMember(input.workspaceId, input.userId, role);
+          const updated = await ctx.workspaces.upsertMember(input.workspaceId, input.userId, role);
+          if (input.userId !== ctx.user!.id) {
+            await safeNotify(
+              ctx.notifications.create(input.userId, {
+                type: 'workspace_member_role_updated',
+                title: `Votre rôle a été modifié dans "${workspace.title}"`,
+                body: `Nouveau rôle: ${role}`,
+                actorId: ctx.user!.id,
+                data: { workspaceId: workspace.id, role },
+              }),
+            );
+          }
+          return updated;
         }),
 
       remove: protectedProcedure
         .input(z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.members.write');
+          const { workspace } = await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.members.write');
           const before = await ctx.workspaces.getMember(input.workspaceId, input.userId);
           if (!before) throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
           if (before.role === 'admin') {
@@ -610,6 +715,17 @@ export const appRouter = router({
             }
           }
           await ctx.workspaces.removeMember(input.workspaceId, input.userId);
+          if (input.userId !== ctx.user!.id) {
+            await safeNotify(
+              ctx.notifications.create(input.userId, {
+                type: 'workspace_member_removed',
+                title: `Vous avez été retiré du workspace "${workspace.title}"`,
+                body: null,
+                actorId: ctx.user!.id,
+                data: { workspaceId: workspace.id },
+              }),
+            );
+          }
           return { ok: true };
         }),
     }),
@@ -712,13 +828,35 @@ export const appRouter = router({
 
       accept: protectedProcedure
         .input(z.object({ token: z.string().min(1) }))
-        .mutation(({ ctx, input }) => ctx.workspaces.acceptInvitationByToken(input.token, ctx.user!.id)),
+        .mutation(async ({ ctx, input }) => {
+          const inv = await ctx.workspaces.acceptInvitationByToken(input.token, ctx.user!.id);
+          await safeNotify(
+            ctx.notifications.create(inv.createdBy, {
+              type: 'workspace_invitation_accepted',
+              title: `Invitation acceptée`,
+              body: `Un membre a accepté votre invitation.`,
+              actorId: ctx.user!.id,
+              data: { workspaceId: inv.workspaceId, invitationId: inv.id },
+            }),
+          );
+          return inv;
+        }),
 
       decline: protectedProcedure
         .input(z.object({ token: z.string().min(1) }))
-        .mutation(({ ctx, input }) =>
-          ctx.workspaces.declineInvitationByToken(input.token, ctx.user!.id),
-        ),
+        .mutation(async ({ ctx, input }) => {
+          const inv = await ctx.workspaces.declineInvitationByToken(input.token, ctx.user!.id);
+          await safeNotify(
+            ctx.notifications.create(inv.createdBy, {
+              type: 'workspace_invitation_declined',
+              title: `Invitation refusée`,
+              body: `Un membre a refusé votre invitation.`,
+              actorId: ctx.user!.id,
+              data: { workspaceId: inv.workspaceId, invitationId: inv.id },
+            }),
+          );
+          return inv;
+        }),
     }),
   }),
   tickets: router({
@@ -779,8 +917,27 @@ export const appRouter = router({
       add: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), content: z.string().min(1).max(10000) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
-          return await ctx.tickets.addComment(input.ticketId, { authorId: ctx.user!.id, content: input.content.trim() });
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          const comment = await ctx.tickets.addComment(input.ticketId, { authorId: ctx.user!.id, content: input.content.trim() });
+
+          const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
+          const targets = assigneeIds.filter((id) => id !== ctx.user!.id);
+          const snippet = input.content.trim().slice(0, 140);
+          await Promise.all(
+            targets.map((userId) =>
+              safeNotify(
+                ctx.notifications.create(userId, {
+                  type: 'ticket_comment_added',
+                  title: `Nouveau commentaire: "${ticket.title}"`,
+                  body: snippet.length ? snippet : null,
+                  actorId: ctx.user!.id,
+                  data: { ticketId: ticket.id, boardId: ticket.boardId, commentId: comment.id },
+                }),
+              ),
+            ),
+          );
+
+          return comment;
         }),
 
       update: protectedProcedure
@@ -811,18 +968,40 @@ export const appRouter = router({
       add: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), userId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
           const exists = await ctx.users.getById(input.userId);
           if (!exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
           await ctx.tickets.addAssignee(input.ticketId, input.userId);
+          if (input.userId !== ctx.user!.id) {
+            await safeNotify(
+              ctx.notifications.create(input.userId, {
+                type: 'ticket_assigned',
+                title: `Vous avez été assigné à "${ticket.title}"`,
+                body: null,
+                actorId: ctx.user!.id,
+                data: { ticketId: ticket.id, boardId: ticket.boardId },
+              }),
+            );
+          }
           return { ok: true };
         }),
 
       remove: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), userId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
           await ctx.tickets.removeAssignee(input.ticketId, input.userId);
+          if (input.userId !== ctx.user!.id) {
+            await safeNotify(
+              ctx.notifications.create(input.userId, {
+                type: 'ticket_unassigned',
+                title: `Vous avez été désassigné de "${ticket.title}"`,
+                body: null,
+                actorId: ctx.user!.id,
+                data: { ticketId: ticket.id, boardId: ticket.boardId },
+              }),
+            );
+          }
           return { ok: true };
         }),
     }),
@@ -981,8 +1160,26 @@ export const appRouter = router({
       complete: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), attachmentId: z.string().min(1), size: z.number().int().min(0).optional() }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
-          return await ctx.tickets.completeAttachment(input.ticketId, input.attachmentId, { size: input.size });
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const att = await ctx.tickets.completeAttachment(input.ticketId, input.attachmentId, { size: input.size });
+
+          const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
+          const targets = assigneeIds.filter((id) => id !== ctx.user!.id);
+          await Promise.all(
+            targets.map((userId) =>
+              safeNotify(
+                ctx.notifications.create(userId, {
+                  type: 'ticket_attachment_uploaded',
+                  title: `Pièce jointe ajoutée: "${ticket.title}"`,
+                  body: att.filename ?? null,
+                  actorId: ctx.user!.id,
+                  data: { ticketId: ticket.id, boardId: ticket.boardId, attachmentId: att.id },
+                }),
+              ),
+            ),
+          );
+
+          return att;
         }),
 
       download: protectedProcedure

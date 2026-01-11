@@ -42,4 +42,8 @@ export type {
 export { TicketsStore } from './tickets/tickets.store';
 export { TicketsService } from './tickets/tickets.service';
 
+export type { NotificationModel, NotificationCreateInput, NotificationType } from './notifications/notification.model';
+export { NotificationsStore } from './notifications/notifications.store';
+export { NotificationsService } from './notifications/notifications.service';
+
 
