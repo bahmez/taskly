@@ -10,7 +10,13 @@ import { access } from 'node:fs/promises';
 import { AppModule } from './app.module.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { FIREBASE_ADMIN_APP, FIREBASE_AUTH } from '@taskly/firebase';
-import { BoardsService, TicketsService, UsersService, WorkspacesService } from '@taskly/database';
+import {
+  BoardsService,
+  NotificationsService,
+  TicketsService,
+  UsersService,
+  WorkspacesService,
+} from '@taskly/database';
 import type { AppRouter, Context } from '@taskly/trpc';
 import { GcsService } from './gcs/gcs.service.js';
 import crypto from 'node:crypto';
@@ -76,6 +82,7 @@ async function bootstrap() {
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
   const ticketsService = app.get(TicketsService);
+  const notificationsService = app.get(NotificationsService);
   const gcsService = app.get(GcsService);
 
   // Resolve + load @taskly/trpc at runtime so we can log what actually happens (race vs link issue).
@@ -294,21 +301,29 @@ async function bootstrap() {
           },
         });
 
+        const notifications = {
+          create: notificationsService.create.bind(notificationsService),
+          list: notificationsService.list.bind(notificationsService),
+          countUnread: notificationsService.countUnread.bind(notificationsService),
+          markRead: notificationsService.markRead.bind(notificationsService),
+          markAllRead: notificationsService.markAllRead.bind(notificationsService),
+        };
+
         if (!token) {
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null) };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards, tickets: makeTickets(user.id) };
+          return { user, users, workspaces, boards, tickets: makeTickets(user.id), notifications };
         } catch (e) {
           if (process.env.NODE_ENV !== 'production') {
             const err = e as { message?: string; code?: string };
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null) };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications };
         }
       },
     }),
