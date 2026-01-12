@@ -37,7 +37,7 @@ import {
   useToast,
 } from '@taskly/ui';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
-import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical } from 'lucide-react';
+import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar } from 'lucide-react';
 import TicketDialogV2 from '@/components/ticket/ticket-dialog-v2';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -77,6 +77,7 @@ type TicketLike = {
   columnId: string;
   title: string;
   position?: number;
+  dueDate?: string | null;
   assigneeIds?: string[];
   labelIds?: string[];
 };
@@ -112,6 +113,18 @@ function SortableBoardTicket({
   const hasChecklist = false; // TODO: query checklists count
   const hasAttachment = false;
   const hasComment = false;
+  const dueDateLabel = React.useMemo(() => {
+    if (!t.dueDate) return null;
+    const d = new Date(t.dueDate);
+    if (!Number.isFinite(d.getTime())) return null;
+    return d.toLocaleDateString();
+  }, [t.dueDate]);
+  const isOverdue = React.useMemo(() => {
+    if (!t.dueDate) return false;
+    const ms = Date.parse(t.dueDate);
+    if (!Number.isFinite(ms)) return false;
+    return ms < Date.now();
+  }, [t.dueDate]);
 
   return (
     <div ref={setNodeRef} style={style} className={cn(isDragging && 'opacity-60')}>
@@ -156,6 +169,20 @@ function SortableBoardTicket({
 
         {/* Badges footer */}
         <div className="flex items-center gap-3 mt-3">
+          {dueDateLabel && (
+            <div
+              className={cn(
+                'flex items-center gap-1 text-xs rounded px-2 py-1 border',
+                isOverdue
+                  ? 'text-red-200 border-red-500/40 bg-red-500/10'
+                  : 'text-[#9fadbc] border-[#9fadbc29] bg-[#1d2125]',
+              )}
+              title={t.dueDate ? new Date(t.dueDate).toLocaleString() : undefined}
+            >
+              <Calendar className="h-3 w-3" />
+              <span>{dueDateLabel}</span>
+            </div>
+          )}
           {hasChecklist && (
             <div className="flex items-center gap-1 text-xs text-[#9fadbc]">
               <CheckSquare className="h-3 w-3" />

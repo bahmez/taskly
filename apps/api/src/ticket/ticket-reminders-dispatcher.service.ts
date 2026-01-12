@@ -13,8 +13,18 @@ export class TicketRemindersDispatcherService implements OnModuleInit, OnModuleD
   ) {}
 
   async runOnce(nowMs = Date.now()): Promise<{ claimed: number; sent: number }> {
+    // In dev, if @taskly/database runtime build is stale, Nest may inject `undefined` here.
+    // Never crash the API because of the dispatcher.
+    if (!this.reminders) return { claimed: 0, sent: 0 };
+
     const claimId = crypto.randomBytes(12).toString('hex');
-    const due = await this.reminders.claimDue(nowMs, { limit: 200, claimId, claimTtlMs: 5 * 60_000 });
+    const due =
+      typeof (this.reminders as unknown as { claimDue?: unknown }).claimDue === 'function'
+        ? await this.reminders.claimDue(nowMs, { limit: 200, claimId, claimTtlMs: 5 * 60_000 })
+        : // Backward-compatible fallback (older @taskly/database build)
+          await (this.reminders as unknown as { listDue: (nowMs: number, input?: { limit?: number }) => Promise<any[]> }).listDue(nowMs, {
+            limit: 200,
+          });
 
     let sent = 0;
     for (const r of due) {
@@ -40,12 +50,16 @@ export class TicketRemindersDispatcherService implements OnModuleInit, OnModuleD
         }
 
         // Mark as processed so we don't retry forever.
-        await this.reminders.markSent(r.boardId, r.ticketId, r.id, { notificationIds, claimId });
+        if (typeof (this.reminders as unknown as { markSent?: unknown }).markSent === 'function') {
+          await this.reminders.markSent(r.boardId, r.ticketId, r.id, { notificationIds, claimId });
+        }
         sent++;
       } catch {
         // Best-effort: a reminder dispatch should never crash the API process.
         try {
-          await this.reminders.releaseClaim(r.boardId, r.ticketId, r.id, claimId);
+          if (typeof (this.reminders as unknown as { releaseClaim?: unknown }).releaseClaim === 'function') {
+            await this.reminders.releaseClaim(r.boardId, r.ticketId, r.id, claimId);
+          }
         } catch {
           // ignore
         }
@@ -68,8 +82,14 @@ export class TicketRemindersDispatcherService implements OnModuleInit, OnModuleD
     const intervalMs = Number.isFinite(intervalMsRaw) && intervalMsRaw > 0 ? intervalMsRaw : 60_000;
 
     // Run once on startup, then periodically.
-    void this.runOnce();
-    this.timer = setInterval(() => void this.runOnce(), intervalMs);
+    this.runOnce().catch(() => {
+      // ignore (best-effort)
+    });
+    this.timer = setInterval(() => {
+      void this.runOnce().catch(() => {
+        // ignore (best-effort)
+      });
+    }, intervalMs);
   }
 
   onModuleDestroy(): void {
