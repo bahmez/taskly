@@ -170,7 +170,7 @@ describe('WorkspacesStore', () => {
           }),
         }),
       }),
-      collection: (name: string) => ({
+      collection: (_name: string) => ({
         doc: (workspaceId: string) => ({
           id: workspaceId,
           collection: (_sub: string) => ({

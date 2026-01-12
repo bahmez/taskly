@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { FieldPath, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FIRESTORE } from '@taskly/firebase';
 import type {

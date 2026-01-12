@@ -46,4 +46,8 @@ export type { NotificationModel, NotificationCreateInput, NotificationType } fro
 export { NotificationsStore } from './notifications/notifications.store';
 export { NotificationsService } from './notifications/notifications.service';
 
+export type { ActivityLogModel, ActivityLogCreateInput, ActivityLogType } from './activity-logs/activity-log.model';
+export { ActivityLogsStore } from './activity-logs/activity-logs.store';
+export { ActivityLogsService } from './activity-logs/activity-logs.service';
+
 

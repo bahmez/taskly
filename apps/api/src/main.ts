@@ -5,12 +5,11 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 import cors from 'cors';
 import util from 'node:util';
-import { createRequire } from 'node:module';
-import { access } from 'node:fs/promises';
 import { AppModule } from './app.module.js';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { FIREBASE_ADMIN_APP, FIREBASE_AUTH } from '@taskly/firebase';
 import {
+  ActivityLogsService,
   BoardsService,
   NotificationsService,
   TicketsService,
@@ -40,10 +39,6 @@ function buildObjectPath(boardId: string, ticketId: string, filename: string): s
 }
 
 async function bootstrap() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'apps/api/src/main.ts:bootstrap',message:'bootstrap start',data:{cwd:process.cwd(),node:process.version,platform:process.platform},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   const server = express();
 
   // CORS au niveau Express, pour couvrir aussi le middleware tRPC monté sur Express.
@@ -83,51 +78,11 @@ async function bootstrap() {
   const boardsService = app.get(BoardsService);
   const ticketsService = app.get(TicketsService);
   const notificationsService = app.get(NotificationsService);
+  const activityLogsService = app.get(ActivityLogsService);
   const gcsService = app.get(GcsService);
 
-  // Resolve + load @taskly/trpc at runtime so we can log what actually happens (race vs link issue).
-  const require = createRequire(import.meta.url);
-  let trpcResolved: string | null = null;
-  try {
-    trpcResolved = require.resolve('@taskly/trpc');
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'apps/api/src/main.ts:trpc-resolve',message:'require.resolve(@taskly/trpc) succeeded',data:{resolved:trpcResolved},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  } catch (e) {
-    const err = e as { message?: string; code?: string };
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'apps/api/src/main.ts:trpc-resolve',message:'require.resolve(@taskly/trpc) failed',data:{code:err?.code ?? null,message:err?.message ?? String(e)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }
-
-  if (trpcResolved) {
-    try {
-      await access(trpcResolved);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'apps/api/src/main.ts:trpc-access',message:'resolved entry exists on disk',data:{resolved:trpcResolved},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-    } catch (e) {
-      const err = e as { message?: string; code?: string };
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'apps/api/src/main.ts:trpc-access',message:'resolved entry missing on disk (likely build race or link issue)',data:{resolved:trpcResolved,code:err?.code ?? null,message:err?.message ?? String(e)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-    }
-  }
-
-  let appRouter: AppRouter;
-  try {
-    const mod = await import('@taskly/trpc');
-    appRouter = (mod as { appRouter: AppRouter }).appRouter;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'apps/api/src/main.ts:trpc-import',message:'dynamic import(@taskly/trpc) succeeded',data:{exports:Object.keys(mod as object),hasAppRouter:!!appRouter},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  } catch (e) {
-    const err = e as { message?: string; code?: string; stack?: string };
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e54a11d-8189-469f-bb83-095a429868a4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'apps/api/src/main.ts:trpc-import',message:'dynamic import(@taskly/trpc) failed',data:{code:err?.code ?? null,message:err?.message ?? String(e),stack:(err?.stack ?? '').split('\n').slice(0,6).join('\n')},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    throw e;
-  }
+  const mod = await import('@taskly/trpc');
+  const appRouter = (mod as { appRouter: AppRouter }).appRouter;
 
   // tRPC endpoint (after Nest is created, so we can reuse its providers)
   server.use(
@@ -309,21 +264,27 @@ async function bootstrap() {
           markAllRead: notificationsService.markAllRead.bind(notificationsService),
         };
 
+        const activityLogs = {
+          create: activityLogsService.create.bind(activityLogsService),
+          listForBoard: activityLogsService.listForBoard.bind(activityLogsService),
+          listForTicket: activityLogsService.listForTicket.bind(activityLogsService),
+        };
+
         if (!token) {
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications, activityLogs };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards, tickets: makeTickets(user.id), notifications };
+          return { user, users, workspaces, boards, tickets: makeTickets(user.id), notifications, activityLogs };
         } catch (e) {
           if (process.env.NODE_ENV !== 'production') {
             const err = e as { message?: string; code?: string };
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications, activityLogs };
         }
       },
     }),
