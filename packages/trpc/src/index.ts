@@ -162,6 +162,66 @@ export type SignedUrl = {
   type: 'write' | 'resumable' | 'read';
 };
 
+export type ActivityLogType =
+  | 'board_created'
+  | 'board_updated'
+  | 'board_archived'
+  | 'board_column_created'
+  | 'board_column_updated'
+  | 'board_column_deleted'
+  | 'board_columns_reordered'
+  | 'board_label_created'
+  | 'board_label_updated'
+  | 'board_label_deleted'
+  | 'board_labels_reordered'
+  | 'ticket_created'
+  | 'ticket_updated'
+  | 'ticket_moved'
+  | 'ticket_archived'
+  | 'ticket_comment_added'
+  | 'ticket_comment_updated'
+  | 'ticket_comment_deleted'
+  | 'ticket_assignee_added'
+  | 'ticket_assignee_removed'
+  | 'ticket_label_added'
+  | 'ticket_label_removed'
+  | 'ticket_checklist_created'
+  | 'ticket_checklist_updated'
+  | 'ticket_checklist_deleted'
+  | 'ticket_checklist_item_added'
+  | 'ticket_checklist_item_updated'
+  | 'ticket_checklist_item_deleted'
+  | 'ticket_attachment_upload_created'
+  | 'ticket_attachment_uploaded'
+  | 'ticket_attachment_removed';
+
+export type ActivityLog = {
+  id: string;
+  boardId: string;
+  ticketId: string | null;
+  type: ActivityLogType;
+  actorId: string | null;
+  data: Record<string, unknown>;
+  createdAt: string;
+  createdAtMs: number;
+};
+
+export type ActivityLogsContext = {
+  create: (
+    boardId: string,
+    input: { ticketId?: string | null; type: ActivityLogType; actorId?: string | null; data?: Record<string, unknown> },
+  ) => Promise<ActivityLog>;
+  listForBoard: (
+    boardId: string,
+    input: { limit: number; cursor?: string | null; includeTickets?: boolean },
+  ) => Promise<{ items: ActivityLog[]; nextCursor: string | null }>;
+  listForTicket: (
+    boardId: string,
+    ticketId: string,
+    input: { limit: number; cursor?: string | null },
+  ) => Promise<{ items: ActivityLog[]; nextCursor: string | null }>;
+};
+
 export type WorkspaceInvitation = {
   id: string;
   workspaceId: string;
@@ -328,6 +388,7 @@ export type Context = {
   boards: BoardsContext;
   tickets: TicketsContext;
   notifications: NotificationsContext;
+  activityLogs: ActivityLogsContext;
 };
 
 const t = initTRPC.context<Context>().create({
@@ -348,6 +409,14 @@ async function safeNotify(p: Promise<unknown>): Promise<void> {
     await p;
   } catch {
     // Best-effort: never fail the main action because of a notification write.
+  }
+}
+
+async function safeLog(p: Promise<unknown>): Promise<void> {
+  try {
+    await p;
+  } catch {
+    // Best-effort: never fail the main action because of an activity-log write.
   }
 }
 
@@ -890,19 +959,36 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+        const { ticket: before } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
         const patch: { title?: string; description?: string; dueDate?: string | null } = {};
         if (typeof input.title === 'string') patch.title = input.title.trim();
         if (typeof input.description === 'string') patch.description = input.description;
         if (input.dueDate === null || typeof input.dueDate === 'string') patch.dueDate = input.dueDate;
-        return await ctx.tickets.update(input.ticketId, patch);
+        const updated = await ctx.tickets.update(input.ticketId, patch);
+        await safeLog(
+          ctx.activityLogs.create(before.boardId, {
+            ticketId: before.id,
+            type: 'ticket_updated',
+            actorId: ctx.user!.id,
+            data: { patch },
+          }),
+        );
+        return updated;
       }),
 
     remove: protectedProcedure
       .input(z.object({ ticketId: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+        const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
         await ctx.tickets.archive(input.ticketId);
+        await safeLog(
+          ctx.activityLogs.create(ticket.boardId, {
+            ticketId: ticket.id,
+            type: 'ticket_archived',
+            actorId: ctx.user!.id,
+            data: {},
+          }),
+        );
         return { ok: true };
       }),
 
@@ -919,6 +1005,15 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
           const comment = await ctx.tickets.addComment(input.ticketId, { authorId: ctx.user!.id, content: input.content.trim() });
+
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_comment_added',
+              actorId: ctx.user!.id,
+              data: { commentId: comment.id },
+            }),
+          );
 
           const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
           const targets = assigneeIds.filter((id) => id !== ctx.user!.id);
@@ -943,15 +1038,32 @@ export const appRouter = router({
       update: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), commentId: z.string().min(1), content: z.string().min(1).max(10000) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
-          return await ctx.tickets.updateComment(input.ticketId, input.commentId, { content: input.content.trim() });
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          const updated = await ctx.tickets.updateComment(input.ticketId, input.commentId, { content: input.content.trim() });
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_comment_updated',
+              actorId: ctx.user!.id,
+              data: { commentId: input.commentId },
+            }),
+          );
+          return updated;
         }),
 
       remove: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), commentId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
           await ctx.tickets.deleteComment(input.ticketId, input.commentId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_comment_deleted',
+              actorId: ctx.user!.id,
+              data: { commentId: input.commentId },
+            }),
+          );
           return { ok: true };
         }),
     }),
@@ -972,6 +1084,14 @@ export const appRouter = router({
           const exists = await ctx.users.getById(input.userId);
           if (!exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
           await ctx.tickets.addAssignee(input.ticketId, input.userId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_assignee_added',
+              actorId: ctx.user!.id,
+              data: { userId: input.userId },
+            }),
+          );
           if (input.userId !== ctx.user!.id) {
             await safeNotify(
               ctx.notifications.create(input.userId, {
@@ -991,6 +1111,14 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.assignments.write');
           await ctx.tickets.removeAssignee(input.ticketId, input.userId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_assignee_removed',
+              actorId: ctx.user!.id,
+              data: { userId: input.userId },
+            }),
+          );
           if (input.userId !== ctx.user!.id) {
             await safeNotify(
               ctx.notifications.create(input.userId, {
@@ -1018,16 +1146,32 @@ export const appRouter = router({
       add: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), labelId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
           await ctx.tickets.addLabel(input.ticketId, input.labelId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_label_added',
+              actorId: ctx.user!.id,
+              data: { labelId: input.labelId },
+            }),
+          );
           return { ok: true };
         }),
 
       remove: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), labelId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
           await ctx.tickets.removeLabel(input.ticketId, input.labelId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_label_removed',
+              actorId: ctx.user!.id,
+              data: { labelId: input.labelId },
+            }),
+          );
           return { ok: true };
         }),
     }),
@@ -1043,8 +1187,17 @@ export const appRouter = router({
       create: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), title: z.string().min(1).max(200) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
-          return await ctx.tickets.createChecklist(input.ticketId, { title: input.title.trim() });
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const checklist = await ctx.tickets.createChecklist(input.ticketId, { title: input.title.trim() });
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_checklist_created',
+              actorId: ctx.user!.id,
+              data: { checklistId: checklist.id },
+            }),
+          );
+          return checklist;
         }),
 
       update: protectedProcedure
@@ -1056,10 +1209,19 @@ export const appRouter = router({
           }),
         )
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
           const patch: { title?: string } = {};
           if (typeof input.title === 'string') patch.title = input.title.trim();
-          return await ctx.tickets.updateChecklist(input.ticketId, input.checklistId, patch);
+          const updated = await ctx.tickets.updateChecklist(input.ticketId, input.checklistId, patch);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_checklist_updated',
+              actorId: ctx.user!.id,
+              data: { checklistId: input.checklistId, patch },
+            }),
+          );
+          return updated;
         }),
 
       reorder: protectedProcedure
@@ -1076,8 +1238,16 @@ export const appRouter = router({
       remove: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), checklistId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
           await ctx.tickets.deleteChecklist(input.ticketId, input.checklistId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_checklist_deleted',
+              actorId: ctx.user!.id,
+              data: { checklistId: input.checklistId },
+            }),
+          );
           return { ok: true };
         }),
 
@@ -1085,8 +1255,17 @@ export const appRouter = router({
         add: protectedProcedure
           .input(z.object({ ticketId: z.string().min(1), checklistId: z.string().min(1), content: z.string().min(1).max(2000) }))
           .mutation(async ({ ctx, input }) => {
-            await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
-            return await ctx.tickets.addChecklistItem(input.ticketId, input.checklistId, { content: input.content.trim() });
+            const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+            const item = await ctx.tickets.addChecklistItem(input.ticketId, input.checklistId, { content: input.content.trim() });
+            await safeLog(
+              ctx.activityLogs.create(ticket.boardId, {
+                ticketId: ticket.id,
+                type: 'ticket_checklist_item_added',
+                actorId: ctx.user!.id,
+                data: { checklistId: input.checklistId, itemId: item.id },
+              }),
+            );
+            return item;
           }),
 
         update: protectedProcedure
@@ -1100,14 +1279,23 @@ export const appRouter = router({
             }),
           )
           .mutation(async ({ ctx, input }) => {
-            await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+            const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
             const patch: { content?: string; isDone?: boolean } = {};
             if (typeof input.content === 'string') patch.content = input.content.trim();
             if (typeof input.isDone === 'boolean') patch.isDone = input.isDone;
             if (Object.keys(patch).length === 0) {
               throw new TRPCError({ code: 'BAD_REQUEST', message: 'Nothing to update' });
             }
-            return await ctx.tickets.updateChecklistItem(input.ticketId, input.checklistId, input.itemId, patch);
+            const updated = await ctx.tickets.updateChecklistItem(input.ticketId, input.checklistId, input.itemId, patch);
+            await safeLog(
+              ctx.activityLogs.create(ticket.boardId, {
+                ticketId: ticket.id,
+                type: 'ticket_checklist_item_updated',
+                actorId: ctx.user!.id,
+                data: { checklistId: input.checklistId, itemId: input.itemId, patch },
+              }),
+            );
+            return updated;
           }),
 
         reorder: protectedProcedure
@@ -1124,8 +1312,16 @@ export const appRouter = router({
         remove: protectedProcedure
           .input(z.object({ ticketId: z.string().min(1), checklistId: z.string().min(1), itemId: z.string().min(1) }))
           .mutation(async ({ ctx, input }) => {
-            await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+            const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
             await ctx.tickets.deleteChecklistItem(input.ticketId, input.checklistId, input.itemId);
+            await safeLog(
+              ctx.activityLogs.create(ticket.boardId, {
+                ticketId: ticket.id,
+                type: 'ticket_checklist_item_deleted',
+                actorId: ctx.user!.id,
+                data: { checklistId: input.checklistId, itemId: input.itemId },
+              }),
+            );
             return { ok: true };
           }),
       }),
@@ -1149,12 +1345,21 @@ export const appRouter = router({
           }),
         )
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
-          return await ctx.tickets.createAttachmentUpload(input.ticketId, {
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const res = await ctx.tickets.createAttachmentUpload(input.ticketId, {
             filename: input.filename.trim(),
             contentType: input.contentType.trim(),
             resumable: input.resumable,
           });
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_attachment_upload_created',
+              actorId: ctx.user!.id,
+              data: { attachmentId: res.attachment.id, filename: res.attachment.filename },
+            }),
+          );
+          return res;
         }),
 
       complete: protectedProcedure
@@ -1162,6 +1367,15 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
           const att = await ctx.tickets.completeAttachment(input.ticketId, input.attachmentId, { size: input.size });
+
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_attachment_uploaded',
+              actorId: ctx.user!.id,
+              data: { attachmentId: att.id, filename: att.filename, size: att.size ?? null },
+            }),
+          );
 
           const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
           const targets = assigneeIds.filter((id) => id !== ctx.user!.id);
@@ -1192,9 +1406,35 @@ export const appRouter = router({
       remove: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), attachmentId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
-          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
           await ctx.tickets.removeAttachment(input.ticketId, input.attachmentId);
+          await safeLog(
+            ctx.activityLogs.create(ticket.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_attachment_removed',
+              actorId: ctx.user!.id,
+              data: { attachmentId: input.attachmentId },
+            }),
+          );
           return { ok: true };
+        }),
+    }),
+
+    activity: router({
+      list: protectedProcedure
+        .input(
+          z.object({
+            ticketId: z.string().min(1),
+            limit: z.number().int().min(1).max(50).default(20),
+            cursor: z.string().min(1).nullable().optional(),
+          }),
+        )
+        .query(async ({ ctx, input }) => {
+          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          return await ctx.activityLogs.listForTicket(ticket.boardId, input.ticketId, {
+            limit: input.limit,
+            cursor: input.cursor ?? null,
+          });
         }),
     }),
   }),
@@ -1238,12 +1478,20 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await requireBoardPermission(ctx, input.boardId, 'board.meta.write');
+        const { board } = await requireBoardPermission(ctx, input.boardId, 'board.meta.write');
         const patch: { title?: string; description?: string; background?: string | null } = {};
         if (typeof input.title === 'string') patch.title = input.title.trim();
         if (typeof input.description === 'string') patch.description = input.description.trim();
         if (input.background === null || typeof input.background === 'string') patch.background = input.background;
-        return await ctx.boards.updateBoard(input.boardId, patch);
+        const updated = await ctx.boards.updateBoard(input.boardId, patch);
+        await safeLog(
+          ctx.activityLogs.create(board.id, {
+            type: 'board_updated',
+            actorId: ctx.user!.id,
+            data: { patch },
+          }),
+        );
+        return updated;
       }),
 
     columns: router({
@@ -1260,7 +1508,15 @@ export const appRouter = router({
                 .replace(/^_+|_+$/g, '')
                 .slice(0, 48) ||
               'column') + '_' + crypto.randomBytes(4).toString('hex');
-          return await ctx.boards.createColumn(input.boardId, { title: input.title.trim(), key });
+          const col = await ctx.boards.createColumn(input.boardId, { title: input.title.trim(), key });
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_column_created',
+              actorId: ctx.user!.id,
+              data: { columnId: col.id },
+            }),
+          );
+          return col;
         }),
 
       update: protectedProcedure
@@ -1277,7 +1533,15 @@ export const appRouter = router({
           const patch: { title?: string; key?: string } = {};
           if (typeof input.title === 'string') patch.title = input.title.trim();
           if (typeof input.key === 'string') patch.key = input.key.trim();
-          return await ctx.boards.updateColumn(input.boardId, input.columnId, patch);
+          const updated = await ctx.boards.updateColumn(input.boardId, input.columnId, patch);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_column_updated',
+              actorId: ctx.user!.id,
+              data: { columnId: input.columnId, patch },
+            }),
+          );
+          return updated;
         }),
 
       remove: protectedProcedure
@@ -1285,6 +1549,13 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           await requireBoardPermission(ctx, input.boardId, 'board.columns.write');
           await ctx.boards.deleteColumn(input.boardId, input.columnId);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_column_deleted',
+              actorId: ctx.user!.id,
+              data: { columnId: input.columnId },
+            }),
+          );
           return { ok: true };
         }),
 
@@ -1296,6 +1567,13 @@ export const appRouter = router({
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'columnIds must be unique' });
           }
           await ctx.boards.reorderColumns(input.boardId, input.columnIds);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_columns_reordered',
+              actorId: ctx.user!.id,
+              data: { columnIds: input.columnIds },
+            }),
+          );
           return { ok: true };
         }),
     }),
@@ -1314,7 +1592,15 @@ export const appRouter = router({
           await requireBoardPermission(ctx, input.boardId, 'board.meta.write');
           const name = input.name.trim();
           const color = input.color ?? null;
-          return await ctx.boards.createLabel(input.boardId, { name, color });
+          const label = await ctx.boards.createLabel(input.boardId, { name, color });
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_label_created',
+              actorId: ctx.user!.id,
+              data: { labelId: label.id },
+            }),
+          );
+          return label;
         }),
 
       update: protectedProcedure
@@ -1332,7 +1618,15 @@ export const appRouter = router({
           if (typeof input.name === 'string') patch.name = input.name.trim();
           if (typeof input.color === 'string') patch.color = input.color.trim();
           if (Object.keys(patch).length === 0) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Nothing to update' });
-          return await ctx.boards.updateLabel(input.boardId, input.labelId, patch);
+          const updated = await ctx.boards.updateLabel(input.boardId, input.labelId, patch);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_label_updated',
+              actorId: ctx.user!.id,
+              data: { labelId: input.labelId, patch },
+            }),
+          );
+          return updated;
         }),
 
       reorder: protectedProcedure
@@ -1343,6 +1637,13 @@ export const appRouter = router({
             throw new TRPCError({ code: 'BAD_REQUEST', message: 'labelIds must be unique' });
           }
           await ctx.boards.reorderLabels(input.boardId, input.labelIds);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_labels_reordered',
+              actorId: ctx.user!.id,
+              data: { labelIds: input.labelIds },
+            }),
+          );
           return { ok: true };
         }),
 
@@ -1351,6 +1652,13 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           await requireBoardPermission(ctx, input.boardId, 'board.meta.write');
           await ctx.boards.deleteLabel(input.boardId, input.labelId);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              type: 'board_label_deleted',
+              actorId: ctx.user!.id,
+              data: { labelId: input.labelId },
+            }),
+          );
           return { ok: true };
         }),
     }),
@@ -1367,18 +1675,36 @@ export const appRouter = router({
         )
         .mutation(async ({ ctx, input }) => {
           await requireBoardPermission(ctx, input.boardId, 'board.tickets.write');
-          return await ctx.boards.createTicket(input.boardId, {
+          const ticket = await ctx.boards.createTicket(input.boardId, {
             columnId: input.columnId,
             title: input.title.trim(),
             description: input.description ?? '',
           });
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              ticketId: ticket.id,
+              type: 'ticket_created',
+              actorId: ctx.user!.id,
+              data: { columnId: ticket.columnId, title: ticket.title },
+            }),
+          );
+          return ticket;
         }),
 
       move: protectedProcedure
         .input(z.object({ boardId: z.string().min(1), ticketId: z.string().min(1), columnId: z.string().min(1), position: z.number().int().min(1) }))
         .mutation(async ({ ctx, input }) => {
           await requireBoardPermission(ctx, input.boardId, 'board.tickets.write');
+          const before = await ctx.tickets.getById(input.ticketId);
           await ctx.boards.moveTicket(input.boardId, input.ticketId, { columnId: input.columnId, position: input.position });
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              ticketId: input.ticketId,
+              type: 'ticket_moved',
+              actorId: ctx.user!.id,
+              data: { fromColumnId: before?.columnId ?? null, toColumnId: input.columnId, position: input.position },
+            }),
+          );
           return { ok: true };
         }),
 
@@ -1387,7 +1713,35 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           await requireBoardPermission(ctx, input.boardId, 'board.tickets.write');
           await ctx.boards.archiveTicket(input.boardId, input.ticketId);
+          await safeLog(
+            ctx.activityLogs.create(input.boardId, {
+              ticketId: input.ticketId,
+              type: 'ticket_archived',
+              actorId: ctx.user!.id,
+              data: {},
+            }),
+          );
           return { ok: true };
+        }),
+    }),
+
+    activity: router({
+      list: protectedProcedure
+        .input(
+          z.object({
+            boardId: z.string().min(1),
+            limit: z.number().int().min(1).max(50).default(20),
+            cursor: z.string().min(1).nullable().optional(),
+            includeTickets: z.boolean().optional(),
+          }),
+        )
+        .query(async ({ ctx, input }) => {
+          await requireBoardPermission(ctx, input.boardId, 'board.meta.read');
+          return await ctx.activityLogs.listForBoard(input.boardId, {
+            limit: input.limit,
+            cursor: input.cursor ?? null,
+            includeTickets: input.includeTickets ?? true,
+          });
         }),
     }),
   }),

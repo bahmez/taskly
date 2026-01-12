@@ -9,6 +9,8 @@ import { TicketsStore } from './tickets/tickets.store';
 import { TicketsService } from './tickets/tickets.service';
 import { NotificationsStore } from './notifications/notifications.store';
 import { NotificationsService } from './notifications/notifications.service';
+import { ActivityLogsStore } from './activity-logs/activity-logs.store';
+import { ActivityLogsService } from './activity-logs/activity-logs.service';
 
 @Global()
 @Module({
@@ -23,6 +25,8 @@ import { NotificationsService } from './notifications/notifications.service';
     TicketsService,
     NotificationsStore,
     NotificationsService,
+    ActivityLogsStore,
+    ActivityLogsService,
   ],
   exports: [
     UsersStore,
@@ -35,6 +39,8 @@ import { NotificationsService } from './notifications/notifications.service';
     TicketsService,
     NotificationsStore,
     NotificationsService,
+    ActivityLogsStore,
+    ActivityLogsService,
   ],
 })
 export class DatabaseModule {}
