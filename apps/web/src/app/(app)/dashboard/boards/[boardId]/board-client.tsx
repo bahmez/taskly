@@ -37,7 +37,7 @@ import {
   useToast,
 } from '@taskly/ui';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
-import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar } from 'lucide-react';
+import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar, ScrollText, Clock } from 'lucide-react';
 import TicketDialogV2 from '@/components/ticket/ticket-dialog-v2';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -69,6 +69,75 @@ function getOptionalStringProp(obj: unknown, key: string): string | undefined {
   if (!obj || typeof obj !== 'object') return undefined;
   const v = (obj as Record<string, unknown>)[key];
   return typeof v === 'string' ? v : undefined;
+}
+
+function formatBoardActivityType(input: { type: string; ticketTitle?: string | null }): string {
+  switch (input.type) {
+    case 'board_created':
+      return 'Board created';
+    case 'board_updated':
+      return 'Board updated';
+    case 'board_archived':
+      return 'Board archived';
+    case 'board_column_created':
+      return 'Column created';
+    case 'board_column_updated':
+      return 'Column updated';
+    case 'board_column_deleted':
+      return 'Column deleted';
+    case 'board_columns_reordered':
+      return 'Columns reordered';
+    case 'board_label_created':
+      return 'Label created';
+    case 'board_label_updated':
+      return 'Label updated';
+    case 'board_label_deleted':
+      return 'Label deleted';
+    case 'board_labels_reordered':
+      return 'Labels reordered';
+    case 'ticket_created':
+      return `Ticket created${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_updated':
+      return `Ticket updated${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_moved':
+      return `Ticket moved${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_archived':
+      return `Ticket archived${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_comment_added':
+      return `Comment added${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_comment_updated':
+      return `Comment updated${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_comment_deleted':
+      return `Comment deleted${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_assignee_added':
+      return `Assignee added${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_assignee_removed':
+      return `Assignee removed${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_label_added':
+      return `Label added${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_label_removed':
+      return `Label removed${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_checklist_created':
+      return `Checklist created${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_checklist_updated':
+      return `Checklist updated${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_checklist_deleted':
+      return `Checklist deleted${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_checklist_item_added':
+      return `Checklist item added${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_checklist_item_updated':
+      return `Checklist item updated${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_checklist_item_deleted':
+      return `Checklist item deleted${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_attachment_upload_created':
+      return `Attachment upload started${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_attachment_uploaded':
+      return `Attachment uploaded${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    case 'ticket_attachment_removed':
+      return `Attachment removed${input.ticketTitle ? `: ${input.ticketTitle}` : ''}`;
+    default:
+      return input.type;
+  }
 }
 
 type AnyLabel = { id: string; name: string; color: string };
@@ -441,6 +510,11 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
   const viewQuery = api.boards.view.useQuery({ boardId });
   const labelsQuery = api.boards.labels.list.useQuery({ boardId });
+  const [boardActivityOpen, setBoardActivityOpen] = React.useState(false);
+  const boardActivityQuery = api.boards.activity.list.useQuery(
+    { boardId, limit: 30, cursor: null, includeTickets: true },
+    { enabled: boardActivityOpen },
+  );
 
   React.useEffect(() => {
     if (viewQuery.data?.board?.workspaceId) {
@@ -544,6 +618,31 @@ export default function BoardClient({ boardId }: { boardId: string }) {
   const usersById = React.useMemo(() => {
     return new Map((assigneeUsersQuery.data ?? []).map((u) => [u.id, u]));
   }, [assigneeUsersQuery.data]);
+
+  const boardActivityItems = boardActivityQuery.data?.items ?? [];
+  const activityActorIds = React.useMemo(() => {
+    const ids = boardActivityItems.map((i) => i.actorId).filter(Boolean) as string[];
+    return Array.from(new Set(ids));
+  }, [boardActivityItems]);
+  const activityActorsQuery = api.users.byIds.useQuery({ ids: activityActorIds }, { enabled: boardActivityOpen && activityActorIds.length > 0 });
+
+  const activityUsersById = React.useMemo(() => {
+    const all = [...(assigneeUsersQuery.data ?? []), ...(activityActorsQuery.data ?? [])];
+    return new Map(all.map((u) => [u.id, u]));
+  }, [assigneeUsersQuery.data, activityActorsQuery.data]);
+
+  const formatActor = React.useCallback(
+    (userId: string | null): string => {
+      if (!userId) return 'Système';
+      const u = activityUsersById.get(userId);
+      if (!u) return userId;
+      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+      if (full) return full;
+      if (u.username) return u.username;
+      return userId;
+    },
+    [activityUsersById],
+  );
 
   const formatUserPrimary = React.useCallback(
     (userId: string): string => {
@@ -801,6 +900,58 @@ export default function BoardClient({ boardId }: { boardId: string }) {
         </div>
 
         <div className="flex gap-2">
+          <Dialog open={boardActivityOpen} onOpenChange={setBoardActivityOpen}>
+            <Button variant="ghost" className="gap-2" onClick={() => setBoardActivityOpen(true)}>
+              <ScrollText className="h-4 w-4" />
+              Activity
+            </Button>
+            <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Board activity</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                {boardActivityItems.length === 0 ? (
+                  <div className="text-sm text-[#9fadbc]">No activity yet.</div>
+                ) : (
+                  boardActivityItems.map((it) => {
+                    const ticketTitle = it.ticketId ? ticketsState.find((t) => t.id === it.ticketId)?.title ?? null : null;
+                    return (
+                      <div key={it.id} className="flex items-start gap-3 bg-[#282e33] border border-[#9fadbc29] rounded-lg p-3">
+                        <div className="h-9 w-9 shrink-0 rounded bg-[#1d2125] border border-[#9fadbc29] flex items-center justify-center">
+                          <Clock className="h-4 w-4 text-[#9fadbc]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold">
+                            {formatBoardActivityType({ type: it.type, ticketTitle })}
+                          </div>
+                          <div className="text-xs text-[#9fadbc] mt-1">
+                            {formatActor(it.actorId)} • {new Date(it.createdAt).toLocaleString()}
+                            {it.ticketId ? (
+                              <>
+                                {' '}
+                                •{' '}
+                                <button
+                                  type="button"
+                                  className="underline hover:text-[#b6c2cf]"
+                                  onClick={() => {
+                                    setBoardActivityOpen(false);
+                                    setOpenedTicketId(it.ticketId!);
+                                  }}
+                                >
+                                  Open ticket
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="trello">Add column</Button>

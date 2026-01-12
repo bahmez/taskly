@@ -31,6 +31,7 @@ import {
   FileText,
   Calendar,
   Bell,
+  Clock,
 } from 'lucide-react';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { PromptDialog } from '../ui/prompt-dialog';
@@ -107,6 +108,7 @@ function formatDateTime(iso: string): string {
 export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }: TicketDialogProps) {
   const { toast } = useToast();
   const utils = api.useUtils();
+  const activityListInput = React.useMemo(() => ({ ticketId, limit: 30, cursor: null as string | null }), [ticketId]);
 
   // Queries
   const ticketQuery = api.tickets.get.useQuery({ ticketId }, { enabled: open });
@@ -117,6 +119,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const labelsQuery = api.tickets.labels.list.useQuery({ ticketId }, { enabled: open });
   const boardLabelsQuery = api.boards.labels.list.useQuery({ boardId }, { enabled: open });
   const remindersQuery = api.tickets.reminders.list.useQuery({ ticketId }, { enabled: open });
+  const ticketActivityQuery = api.tickets.activity.list.useQuery(activityListInput, { enabled: open });
 
   const ticket = ticketQuery.data;
   const permissions = ticket?.permissions;
@@ -156,14 +159,28 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     { enabled: open && workspaceMemberIds.length > 0 }
   );
 
+  const ticketActivity = ticketActivityQuery.data?.items ?? [];
+  const activityUserIds = React.useMemo(() => {
+    const ids: string[] = [];
+    for (const a of ticketActivity) {
+      if (a.actorId) ids.push(a.actorId);
+      const userId = (a.data as Record<string, unknown> | undefined)?.userId;
+      if (typeof userId === 'string' && userId) ids.push(userId);
+    }
+    return Array.from(new Set(ids));
+  }, [ticketActivity]);
+
+  const activityUsersQuery = api.users.byIds.useQuery({ ids: activityUserIds }, { enabled: open && activityUserIds.length > 0 });
+
   const usersById = React.useMemo(() => {
     const all = [
       ...(assigneesDetailsQuery.data ?? []),
       ...(commentAuthorsQuery.data ?? []),
       ...(workspaceMembersDetailsQuery.data ?? []),
+      ...(activityUsersQuery.data ?? []),
     ];
     return new Map(all.map((u) => [u.id, u]));
-  }, [assigneesDetailsQuery.data, commentAuthorsQuery.data, workspaceMembersDetailsQuery.data]);
+  }, [assigneesDetailsQuery.data, commentAuthorsQuery.data, workspaceMembersDetailsQuery.data, activityUsersQuery.data]);
 
   const formatUserPrimary = React.useCallback(
     (userId: string): string => {
@@ -214,7 +231,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
   const addComment = api.tickets.comments.add.useMutation({
     onSuccess: async () => {
-      await utils.tickets.comments.list.invalidate({ ticketId });
+      await Promise.all([utils.tickets.comments.list.invalidate({ ticketId }), utils.tickets.activity.list.invalidate(activityListInput)]);
       setNewComment('');
       toast({ title: 'Comment added' });
     },
@@ -367,6 +384,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const [newChecklistItemContent, setNewChecklistItemContent] = React.useState<Record<string, string>>({});
   const [dueDateDraft, setDueDateDraft] = React.useState('');
   const [reminderDraft, setReminderDraft] = React.useState('');
+  const [ticketFeedView, setTicketFeedView] = React.useState<'comments' | 'history'>('comments');
 
   // Dialog states
   const [confirmDialog, setConfirmDialog] = React.useState<{ open: boolean; title: string; description?: string; onConfirm: () => void }>({
@@ -392,6 +410,10 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     }
   }, [ticket]);
 
+  React.useEffect(() => {
+    if (open) setTicketFeedView('comments');
+  }, [open]);
+
   const canEdit = permissions?.canContentWrite ?? false;
   const canComment = permissions?.canCommentsWrite ?? false;
   const canAssign = permissions?.canAssignmentsWrite ?? false;
@@ -406,6 +428,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
   const boardLabels = boardLabelsQuery.data ?? [];
   const ticketLabelIds = labelsQuery.data?.labelIds ?? [];
+  const labelById = React.useMemo(() => new Map(boardLabels.map((l) => [l.id, l])), [boardLabels]);
 
   if (!ticket) {
     return (
@@ -723,10 +746,28 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <MessageSquare className="h-5 w-5 text-[#9fadbc]" />
-                  <h3 className="text-sm font-semibold text-[#b6c2cf]">Activity</h3>
+                  <h3 className="text-sm font-semibold text-[#b6c2cf]">
+                    {ticketFeedView === 'history' ? 'Activity' : 'Comments'}
+                  </h3>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={ticketFeedView === 'comments' ? 'trello' : 'ghost'}
+                      onClick={() => setTicketFeedView('comments')}
+                    >
+                      Comments
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={ticketFeedView === 'history' ? 'trello' : 'ghost'}
+                      onClick={() => setTicketFeedView('history')}
+                    >
+                      History
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-4">
-                  {canComment && (
+                  {ticketFeedView === 'comments' && canComment && (
                     <div className="flex gap-3">
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarFallback className="bg-[#44546f] text-white text-xs">
@@ -754,7 +795,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     </div>
                   )}
 
-                  {commentsQuery.data?.map((c) => (
+                  {ticketFeedView === 'comments' &&
+                    commentsQuery.data?.map((c) => (
                     <div key={c.id} className="flex gap-3">
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarFallback className="bg-[#44546f] text-white text-xs">
@@ -775,6 +817,103 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       </div>
                     </div>
                   ))}
+
+                  {ticketFeedView === 'history' && (
+                    <div className="space-y-2">
+                      {ticketActivity.length === 0 ? (
+                        <div className="text-xs text-[#9fadbc]">No activity yet.</div>
+                      ) : (
+                        ticketActivity.map((a) => {
+                          const actor = a.actorId ? formatUserPrimary(a.actorId) : 'System';
+                          const data = a.data as Record<string, unknown>;
+                          const userId = typeof data?.userId === 'string' ? data.userId : null;
+                          const labelId = typeof data?.labelId === 'string' ? data.labelId : null;
+
+                          let label: string = a.type;
+                          switch (a.type) {
+                            case 'ticket_created':
+                              label = 'Ticket created';
+                              break;
+                            case 'ticket_updated':
+                              label = 'Ticket updated';
+                              break;
+                            case 'ticket_moved':
+                              label = 'Ticket moved';
+                              break;
+                            case 'ticket_archived':
+                              label = 'Ticket archived';
+                              break;
+                            case 'ticket_comment_added':
+                              label = 'Comment added';
+                              break;
+                            case 'ticket_comment_updated':
+                              label = 'Comment updated';
+                              break;
+                            case 'ticket_comment_deleted':
+                              label = 'Comment deleted';
+                              break;
+                            case 'ticket_assignee_added':
+                              label = `Assignee added${userId ? `: ${formatUserPrimary(userId)}` : ''}`;
+                              break;
+                            case 'ticket_assignee_removed':
+                              label = `Assignee removed${userId ? `: ${formatUserPrimary(userId)}` : ''}`;
+                              break;
+                            case 'ticket_label_added': {
+                              const name = labelId ? labelById.get(labelId)?.name : null;
+                              label = `Label added${name ? `: ${name}` : ''}`;
+                              break;
+                            }
+                            case 'ticket_label_removed': {
+                              const name = labelId ? labelById.get(labelId)?.name : null;
+                              label = `Label removed${name ? `: ${name}` : ''}`;
+                              break;
+                            }
+                            case 'ticket_checklist_created':
+                              label = 'Checklist created';
+                              break;
+                            case 'ticket_checklist_updated':
+                              label = 'Checklist updated';
+                              break;
+                            case 'ticket_checklist_deleted':
+                              label = 'Checklist deleted';
+                              break;
+                            case 'ticket_checklist_item_added':
+                              label = 'Checklist item added';
+                              break;
+                            case 'ticket_checklist_item_updated':
+                              label = 'Checklist item updated';
+                              break;
+                            case 'ticket_checklist_item_deleted':
+                              label = 'Checklist item deleted';
+                              break;
+                            case 'ticket_attachment_upload_created':
+                              label = 'Attachment upload started';
+                              break;
+                            case 'ticket_attachment_uploaded':
+                              label = 'Attachment uploaded';
+                              break;
+                            case 'ticket_attachment_removed':
+                              label = 'Attachment removed';
+                              break;
+                          }
+
+                          return (
+                            <div key={a.id} className="flex items-start gap-3 bg-[#282e33] border border-[#9fadbc29] rounded-lg p-3">
+                              <div className="h-9 w-9 shrink-0 rounded bg-[#1d2125] border border-[#9fadbc29] flex items-center justify-center">
+                                <Clock className="h-4 w-4 text-[#9fadbc]" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold">{label}</div>
+                                <div className="text-xs text-[#9fadbc] mt-1">
+                                  {actor} • {new Date(a.createdAt).toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
