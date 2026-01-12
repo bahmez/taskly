@@ -41,6 +41,9 @@ export type {
 } from './tickets/ticket.model';
 export { TicketsStore } from './tickets/tickets.store';
 export { TicketsService } from './tickets/tickets.service';
+export type { TicketReminderModel, TicketReminderCreateInput } from './tickets/ticket-reminder.model';
+export { TicketRemindersStore } from './tickets/ticket-reminders.store';
+export { TicketRemindersService } from './tickets/ticket-reminders.service';
 
 export type { NotificationModel, NotificationCreateInput, NotificationType } from './notifications/notification.model';
 export { NotificationsStore } from './notifications/notifications.store';

@@ -7,7 +7,8 @@ export type NotificationType =
   | 'ticket_assigned'
   | 'ticket_unassigned'
   | 'ticket_comment_added'
-  | 'ticket_attachment_uploaded';
+  | 'ticket_attachment_uploaded'
+  | 'ticket_reminder';
 
 export type NotificationModel = {
   id: string;

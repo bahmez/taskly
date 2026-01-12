@@ -131,6 +131,11 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       })),
       removeAttachment: vi.fn(async () => {}),
     },
+    ticketReminders: {
+      list: vi.fn(async () => []),
+      create: vi.fn(async () => ({ id: 'r1', boardId: 'b1', ticketId: 't1', userId: 'u1', remindAt: '2026-01-01T00:00:00.000Z', remindAtMs: 0, createdAt: '', updatedAt: '', sentAt: null, notificationIds: {} })),
+      remove: vi.fn(async () => {}),
+    },
     notifications: {
       create: vi.fn<Context['notifications']['create']>(async (userId, input) => ({
         id: 'n1',
@@ -187,6 +192,29 @@ describe('activity logs (tRPC)', () => {
     const caller = appRouter.createCaller(ctx);
     await caller.tickets.update({ ticketId: 't1', title: 'New title' });
     expect(ctx.activityLogs.create).toHaveBeenCalledWith('b1', expect.objectContaining({ ticketId: 't1', type: 'ticket_updated', actorId: 'u1' }));
+  });
+});
+
+describe('ticket reminders (tRPC)', () => {
+  it('tickets.reminders.list delegates to ctx.ticketReminders.list', async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    await caller.tickets.reminders.list({ ticketId: 't1' });
+    expect(ctx.ticketReminders.list).toHaveBeenCalledWith('t1', { userId: 'u1' });
+  });
+
+  it('tickets.reminders.create delegates to ctx.ticketReminders.create', async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    await caller.tickets.reminders.create({ ticketId: 't1', remindAt: '2026-01-01T00:00:00.000Z' });
+    expect(ctx.ticketReminders.create).toHaveBeenCalledWith('t1', { userId: 'u1', remindAt: '2026-01-01T00:00:00.000Z' });
+  });
+
+  it('tickets.reminders.remove delegates to ctx.ticketReminders.remove', async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    await caller.tickets.reminders.remove({ ticketId: 't1', reminderId: 'r1' });
+    expect(ctx.ticketReminders.remove).toHaveBeenCalledWith('t1', 'r1', { userId: 'u1' });
   });
 });
 
