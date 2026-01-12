@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TicketRemindersDispatcherService } from './ticket-reminders-dispatcher.service';
+import type { NotificationsService, TicketRemindersService, TicketsService } from '@taskly/database';
 
 describe('TicketRemindersDispatcherService', () => {
   it('runOnce sends notifications for due reminders and marks them as sent', async () => {
@@ -16,9 +17,9 @@ describe('TicketRemindersDispatcherService', () => {
     };
 
     const svc = new TicketRemindersDispatcherService(
-      reminders as unknown as any,
-      tickets as unknown as any,
-      notifications as unknown as any,
+      reminders as unknown as TicketRemindersService,
+      tickets as unknown as TicketsService,
+      notifications as unknown as NotificationsService,
     );
 
     await svc.runOnce(1);

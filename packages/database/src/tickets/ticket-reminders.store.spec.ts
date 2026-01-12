@@ -8,6 +8,12 @@ describe('TicketRemindersStore', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
   });
 
+  type DocRef = { path: string };
+  type TxSnap = { exists: boolean; data: () => unknown };
+  type Tx = { get: (ref: DocRef) => Promise<TxSnap>; update: (ref: DocRef, patch: Record<string, unknown>) => void };
+  type QueryDoc = { ref: DocRef; data: () => unknown };
+  type Query = { where: (...args: unknown[]) => Query; orderBy: (...args: unknown[]) => Query; limit: (n: number) => Query; get: () => Promise<{ docs: QueryDoc[] }> };
+
   it('create writes a reminder under boards/{boardId}/tickets/{ticketId}/reminders', async () => {
     const create = vi.fn(async () => undefined);
     const doc = vi.fn(() => ({ id: 'r1', create }));
@@ -48,8 +54,8 @@ describe('TicketRemindersStore', () => {
     const nowMs = 1000;
     const claimId = 'c1';
 
-    const docRef = { path: 'boards/b1/tickets/t1/reminders/r1' };
-    const docData = new Map<string, any>([
+    const docRef: DocRef = { path: 'boards/b1/tickets/t1/reminders/r1' };
+    const docData = new Map<string, Record<string, unknown>>([
       [
         docRef.path,
         {
@@ -67,12 +73,14 @@ describe('TicketRemindersStore', () => {
       ],
     ]);
 
-    const tx = {
-      get: vi.fn(async (ref: any) => ({ exists: true, data: () => docData.get(ref.path) })),
-      update: vi.fn((ref: any, patch: any) => docData.set(ref.path, { ...docData.get(ref.path), ...patch })),
+    const tx: Tx = {
+      get: vi.fn(async (ref: DocRef) => ({ exists: true, data: () => docData.get(ref.path) })),
+      update: vi.fn((ref: DocRef, patch: Record<string, unknown>) =>
+        docData.set(ref.path, { ...(docData.get(ref.path) ?? {}), ...patch }),
+      ),
     };
 
-    const q: any = {
+    const q: Query = {
       where: vi.fn(() => q),
       orderBy: vi.fn(() => q),
       limit: vi.fn(() => q),
@@ -86,7 +94,7 @@ describe('TicketRemindersStore', () => {
         throw new Error('not used');
       },
       collectionGroup: vi.fn(() => q),
-      runTransaction: vi.fn(async (fn: any) => await fn(tx)),
+      runTransaction: vi.fn(async (fn: (t: Tx) => Promise<void>) => await fn(tx)),
     };
 
     const store = new TicketRemindersStore(db as unknown as Firestore);
@@ -97,8 +105,8 @@ describe('TicketRemindersStore', () => {
 
   it('claimDue skips a due reminder already claimed recently by another claimId', async () => {
     const nowMs = 1000;
-    const docRef = { path: 'boards/b1/tickets/t1/reminders/r1' };
-    const docData = new Map<string, any>([
+    const docRef: DocRef = { path: 'boards/b1/tickets/t1/reminders/r1' };
+    const docData = new Map<string, Record<string, unknown>>([
       [
         docRef.path,
         {
@@ -116,12 +124,12 @@ describe('TicketRemindersStore', () => {
       ],
     ]);
 
-    const tx = {
-      get: vi.fn(async (ref: any) => ({ exists: true, data: () => docData.get(ref.path) })),
+    const tx: Tx = {
+      get: vi.fn(async (ref: DocRef) => ({ exists: true, data: () => docData.get(ref.path) })),
       update: vi.fn(),
     };
 
-    const q: any = {
+    const q: Query = {
       where: vi.fn(() => q),
       orderBy: vi.fn(() => q),
       limit: vi.fn(() => q),
@@ -135,7 +143,7 @@ describe('TicketRemindersStore', () => {
         throw new Error('not used');
       },
       collectionGroup: vi.fn(() => q),
-      runTransaction: vi.fn(async (fn: any) => await fn(tx)),
+      runTransaction: vi.fn(async (fn: (t: Tx) => Promise<void>) => await fn(tx)),
     };
 
     const store = new TicketRemindersStore(db as unknown as Firestore);

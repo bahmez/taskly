@@ -12,6 +12,26 @@ export class TicketRemindersDispatcherService implements OnModuleInit, OnModuleD
     private readonly notifications: NotificationsService,
   ) {}
 
+  private static isDueReminder(x: unknown): x is {
+    id: string;
+    boardId: string;
+    ticketId: string;
+    userId: string;
+    remindAt: string;
+    remindAtMs: number;
+  } {
+    if (!x || typeof x !== 'object') return false;
+    const o = x as Record<string, unknown>;
+    return (
+      typeof o.id === 'string' &&
+      typeof o.boardId === 'string' &&
+      typeof o.ticketId === 'string' &&
+      typeof o.userId === 'string' &&
+      typeof o.remindAt === 'string' &&
+      typeof o.remindAtMs === 'number'
+    );
+  }
+
   async runOnce(nowMs = Date.now()): Promise<{ claimed: number; sent: number }> {
     // In dev, if @taskly/database runtime build is stale, Nest may inject `undefined` here.
     // Never crash the API because of the dispatcher.
@@ -22,9 +42,11 @@ export class TicketRemindersDispatcherService implements OnModuleInit, OnModuleD
       typeof (this.reminders as unknown as { claimDue?: unknown }).claimDue === 'function'
         ? await this.reminders.claimDue(nowMs, { limit: 200, claimId, claimTtlMs: 5 * 60_000 })
         : // Backward-compatible fallback (older @taskly/database build)
-          await (this.reminders as unknown as { listDue: (nowMs: number, input?: { limit?: number }) => Promise<any[]> }).listDue(nowMs, {
-            limit: 200,
-          });
+          (
+            await (this.reminders as unknown as {
+              listDue: (nowMs: number, input?: { limit?: number }) => Promise<unknown[]>;
+            }).listDue(nowMs, { limit: 200 })
+          ).filter(TicketRemindersDispatcherService.isDueReminder);
 
     let sent = 0;
     for (const r of due) {
