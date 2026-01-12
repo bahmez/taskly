@@ -107,9 +107,13 @@ export class NotificationsStore {
 
   async markAllRead(userId: string): Promise<void> {
     // Update in chunks to avoid 500 writes per batch limit.
-    while (true) {
+    let keepGoing = true;
+    while (keepGoing) {
       const unread = await this.col(userId).where('readAt', '==', null).limit(450).get();
-      if (unread.empty) return;
+      if (unread.empty) {
+        keepGoing = false;
+        continue;
+      }
       const now = nowIso();
       const batch = this.db.batch();
       for (const d of unread.docs) {
