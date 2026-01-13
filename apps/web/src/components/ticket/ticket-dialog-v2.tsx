@@ -331,7 +331,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const descTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [descMention, setDescMention] = React.useState<ReturnType<typeof findActiveMention> | null>(null);
   const [descMentionIndex, setDescMentionIndex] = React.useState(0);
-  const [descMentionTokens, setDescMentionTokens] = React.useState<MentionToken[]>([]);
 
   const renderCommentContent = React.useCallback((content: string) => {
     // Parse @username mentions and render them as blue chips (not clickable)
@@ -394,7 +393,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       const { text, cursor } = insertMention(currentText, match, u);
       setDescriptionDraft(text);
       descriptionDraftRef.current = text;
-      setDescMentionTokens(parseMentionTokens(text));
       closeDescMentions();
       
       requestAnimationFrame(() => {
@@ -652,7 +650,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       setTitleDraft(ticket.title);
       setDescriptionDraft(ticket.description ?? '');
       descriptionDraftRef.current = ticket.description ?? '';
-      setDescMentionTokens(parseMentionTokens(ticket.description ?? ''));
       setDueDateDraft(ticket.dueDate ? isoToDatetimeLocal(ticket.dueDate) : '');
     }
   }, [ticket]);
@@ -784,7 +781,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         const v = val ?? '';
                         setDescriptionDraft(v);
                         descriptionDraftRef.current = v;
-                        setDescMentionTokens(parseMentionTokens(v));
                       }}
                       height={300}
                       preview="edit"
@@ -859,7 +855,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         onClick={() => {
                           setDescriptionDraft(ticket.description ?? '');
                           descriptionDraftRef.current = ticket.description ?? '';
-                          setDescMentionTokens(parseMentionTokens(ticket.description ?? ''));
                           setIsEditingDescription(false);
                         }}
                       >
