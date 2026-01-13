@@ -448,7 +448,16 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       toast({ title: 'Ticket updated' });
     },
     onError: (e) => {
-      toast({ title: 'Update failed', description: trpcErrorMessage(e), variant: 'destructive' });
+      const msg = trpcErrorMessage(e);
+      if (msg.includes('mention') || msg.includes('Invalid')) {
+        toast({ 
+          title: 'Invalid mention', 
+          description: 'One or more mentioned users are not members of this workspace.',
+          variant: 'destructive' 
+        });
+      } else {
+        toast({ title: 'Update failed', description: msg, variant: 'destructive' });
+      }
     },
   });
 
@@ -458,6 +467,18 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       setNewComment('');
       newCommentRef.current = '';
       toast({ title: 'Comment added' });
+    },
+    onError: (e) => {
+      const msg = trpcErrorMessage(e);
+      if (msg.includes('mention') || msg.includes('Invalid')) {
+        toast({ 
+          title: 'Invalid mention', 
+          description: 'One or more mentioned users are not members of this workspace.',
+          variant: 'destructive' 
+        });
+      } else {
+        toast({ title: 'Failed to add comment', description: msg, variant: 'destructive' });
+      }
     },
   });
 
