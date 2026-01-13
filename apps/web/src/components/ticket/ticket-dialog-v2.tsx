@@ -37,6 +37,17 @@ import { ConfirmDialog } from '../ui/confirm-dialog';
 import { PromptDialog } from '../ui/prompt-dialog';
 import { MemberSelectDialog } from '../ui/member-select-dialog';
 import { LabelManagerDialog } from '../ui/label-manager-dialog';
+import {
+  MentionDropdown,
+  filterMentionUsers,
+  findActiveMention,
+  insertMention,
+  type MentionableUser,
+  parseMentionTokens,
+  mentionMatchFromToken,
+  type MentionToken,
+  findMentionTokenAtCursor,
+} from '../ui/mention-autocomplete';
 
 // MDEditor chargé dynamiquement (client-side only)
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
@@ -182,6 +193,218 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     return new Map(all.map((u) => [u.id, u]));
   }, [assigneesDetailsQuery.data, commentAuthorsQuery.data, workspaceMembersDetailsQuery.data, activityUsersQuery.data]);
 
+  const mentionUsers: MentionableUser[] = React.useMemo(() => {
+    const list = workspaceMembersDetailsQuery.data ?? [];
+    return list
+      .filter((u) => u && u.id && u.username)
+      .map((u) => ({
+        id: u.id,
+        username: u.username,
+        first_name: u.first_name,
+        last_name: u.last_name,
+      }));
+  }, [workspaceMembersDetailsQuery.data]);
+
+  function linkifyMentionsMarkdown(md: string): string {
+    // Legacy cleanup: old format was "@[@username](user:<id>)" which creates a double "@".
+    // Convert it to "[@username](user:<id>)" first.
+    md = md.replace(/@\[@([^\]]+)\]\(user:([^)]+)\)/g, '[@$1](user:$2)');
+
+    // Convert @username occurrences (outside code blocks / inline code) to markdown links
+    // so ReactMarkdown can render them as elements we can style (without real navigation).
+    const segments: { kind: 'code' | 'text'; value: string }[] = [];
+    let i = 0;
+    while (i < md.length) {
+      // fenced code block
+      if (md.startsWith('```', i)) {
+        const end = md.indexOf('```', i + 3);
+        const j = end === -1 ? md.length : end + 3;
+        segments.push({ kind: 'code', value: md.slice(i, j) });
+        i = j;
+        continue;
+      }
+      // inline code
+      if (md[i] === '`') {
+        const end = md.indexOf('`', i + 1);
+        const j = end === -1 ? md.length : end + 1;
+        segments.push({ kind: 'code', value: md.slice(i, j) });
+        i = j;
+        continue;
+      }
+      // normal text run
+      let j = i + 1;
+      while (j < md.length && md[j] !== '`' && !md.startsWith('```', j)) j++;
+      segments.push({ kind: 'text', value: md.slice(i, j) });
+      i = j;
+    }
+    // Match @username: require word boundary before @ (start, space, or punctuation)
+    const re = /(^|[\s\n])@([a-zA-Z0-9._-]{1,50})(?=[\s\n.,!?;:]|$)/g;
+    return segments
+      .map((s) => {
+        if (s.kind === 'code') return s.value;
+        return s.value.replace(re, (_m, pre: string, username: string) => `${pre}[@${username}](mention:${username})`);
+      })
+      .join('');
+  }
+
+  const markdownComponents = React.useMemo(() => {
+    return {
+      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+        const h = href ?? '';
+        if (h.startsWith('mention:')) {
+          // Children should already be "@username" from linkifyMentionsMarkdown
+          return (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60 cursor-default no-underline" style={{ pointerEvents: 'none' }}>
+              {children}
+            </span>
+          );
+        }
+        // Back-compat: old stored mentions as markdown links (user:<id>)
+        if (h.startsWith('user:')) {
+          const userId = h.slice('user:'.length);
+          const u = usersById.get(userId);
+          const username = u?.username ?? userId;
+          // If children is already "@username" format, use it; otherwise prepend @
+          const childText = typeof children === 'string' ? children : String(children ?? '');
+          const label = childText.startsWith('@') ? childText : `@${username}`;
+          return (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60 cursor-default no-underline" style={{ pointerEvents: 'none' }}>
+              {label}
+            </span>
+          );
+        }
+        return (
+          <a href={h} className="underline hover:text-[#b6c2cf]" target="_blank" rel="noreferrer">
+            {children}
+          </a>
+        );
+      },
+    } as const;
+  }, [usersById]);
+
+  // Keep live drafts in refs so mention callbacks don't depend on state variables
+  // that might be declared later in the file (avoids TDZ issues).
+  const newCommentRef = React.useRef('');
+  const descriptionDraftRef = React.useRef('');
+
+  // Mentions state (comments)
+  const commentTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const [commentMention, setCommentMention] = React.useState<ReturnType<typeof findActiveMention> | null>(null);
+  const [commentMentionIndex, setCommentMentionIndex] = React.useState(0);
+
+  const commentMentionCandidates = React.useMemo(() => {
+    if (!commentMention) return [];
+    return filterMentionUsers(mentionUsers, commentMention.query);
+  }, [commentMention, mentionUsers]);
+
+  const closeCommentMentions = React.useCallback(() => {
+    setCommentMention(null);
+    setCommentMentionIndex(0);
+  }, []);
+
+  const applyCommentMention = React.useCallback(
+    (u: MentionableUser) => {
+      const el = commentTextareaRef.current;
+      if (!el) return;
+      
+      const currentText = el.value;
+      const cursorPos = el.selectionStart ?? currentText.length;
+      const match = findActiveMention(currentText, cursorPos);
+      if (!match) return;
+
+      const { text, cursor } = insertMention(currentText, match, u);
+      
+      setNewComment(text);
+      newCommentRef.current = text;
+      closeCommentMentions();
+      
+      // Set cursor after React updates
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(cursor, cursor);
+      }, 0);
+    },
+    [closeCommentMentions],
+  );
+
+  // Mentions state (description / MDEditor textarea)
+  const descTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const [descMention, setDescMention] = React.useState<ReturnType<typeof findActiveMention> | null>(null);
+  const [descMentionIndex, setDescMentionIndex] = React.useState(0);
+  const [descMentionTokens, setDescMentionTokens] = React.useState<MentionToken[]>([]);
+
+  const renderCommentContent = React.useCallback((content: string) => {
+    // Parse @username mentions and render them as blue chips (not clickable)
+    const tokens = parseMentionTokens(content);
+    if (tokens.length === 0) {
+      // No mentions, just render as text (or with basic markdown if needed)
+      return <div className="whitespace-pre-wrap">{content}</div>;
+    }
+
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i]!;
+      if (t.start > cursor) {
+        parts.push(<span key={`t-${i}`}>{content.slice(cursor, t.start)}</span>);
+      }
+      const mentionText = content.slice(t.start, t.end); // "@username"
+      parts.push(
+        <span
+          key={`m-${i}`}
+          className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60"
+          style={{ pointerEvents: 'none' }}
+        >
+          {mentionText}
+        </span>,
+      );
+      cursor = t.end;
+    }
+    if (cursor < content.length) {
+      parts.push(<span key="tail">{content.slice(cursor)}</span>);
+    }
+    return <div className="whitespace-pre-wrap">{parts}</div>;
+  }, []);
+
+  const descMentionCandidates = React.useMemo(() => {
+    if (!descMention) return [];
+    return filterMentionUsers(mentionUsers, descMention.query);
+  }, [descMention, mentionUsers]);
+
+  const closeDescMentions = React.useCallback(() => {
+    setDescMention(null);
+    setDescMentionIndex(0);
+  }, []);
+
+  const applyDescMention = React.useCallback(
+    (u: MentionableUser) => {
+      const el = descTextareaRef.current;
+      const currentText = descriptionDraftRef.current;
+      if (!el) return;
+      
+      const cursorPos = el.selectionStart ?? currentText.length;
+      // First check if cursor is inside an existing mention token
+      const tokenAt = findMentionTokenAtCursor(currentText, cursorPos);
+      const match = tokenAt
+        ? mentionMatchFromToken(tokenAt)
+        : findActiveMention(currentText, cursorPos);
+      
+      if (!match) return;
+
+      const { text, cursor } = insertMention(currentText, match, u);
+      setDescriptionDraft(text);
+      descriptionDraftRef.current = text;
+      setDescMentionTokens(parseMentionTokens(text));
+      closeDescMentions();
+      
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(cursor, cursor);
+      });
+    },
+    [closeDescMentions],
+  );
+
   const formatUserPrimary = React.useCallback(
     (userId: string): string => {
       const u = usersById.get(userId);
@@ -233,6 +456,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     onSuccess: async () => {
       await Promise.all([utils.tickets.comments.list.invalidate({ ticketId }), utils.tickets.activity.list.invalidate(activityListInput)]);
       setNewComment('');
+      newCommentRef.current = '';
       toast({ title: 'Comment added' });
     },
   });
@@ -406,6 +630,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     if (ticket) {
       setTitleDraft(ticket.title);
       setDescriptionDraft(ticket.description ?? '');
+      descriptionDraftRef.current = ticket.description ?? '';
+      setDescMentionTokens(parseMentionTokens(ticket.description ?? ''));
       setDueDateDraft(ticket.dueDate ? isoToDatetimeLocal(ticket.dueDate) : '');
     }
   }, [ticket]);
@@ -533,9 +759,67 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                   <div className="space-y-3" data-color-mode="dark">
                     <MDEditor
                       value={descriptionDraft}
-                      onChange={(val) => setDescriptionDraft(val ?? '')}
+                      onChange={(val) => {
+                        const v = val ?? '';
+                        setDescriptionDraft(v);
+                        descriptionDraftRef.current = v;
+                        setDescMentionTokens(parseMentionTokens(v));
+                      }}
                       height={300}
                       preview="edit"
+                      textareaProps={{
+                        onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                          const target = e.currentTarget;
+                          if (!descTextareaRef.current) descTextareaRef.current = target;
+                          if (!descMention) return;
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            closeDescMentions();
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setDescMentionIndex((i) => Math.min(i + 1, Math.max(0, descMentionCandidates.length - 1)));
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setDescMentionIndex((i) => Math.max(i - 1, 0));
+                          } else if (e.key === 'Enter' || e.key === 'Tab') {
+                            const picked = descMentionCandidates[descMentionIndex];
+                            if (picked) {
+                              e.preventDefault();
+                              applyDescMention(picked);
+                            }
+                          }
+                        },
+                        onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                          const el = e.currentTarget;
+                          if (!descTextareaRef.current) descTextareaRef.current = el;
+                          const cursor = el.selectionStart ?? el.value.length;
+                          const token = findMentionTokenAtCursor(el.value, cursor);
+                          const m = token ? mentionMatchFromToken(token) : findActiveMention(el.value, cursor);
+                          setDescMention(m);
+                          setDescMentionIndex(0);
+                        },
+                        onClick: (e: React.MouseEvent<HTMLTextAreaElement>) => {
+                          const el = e.currentTarget;
+                          if (!descTextareaRef.current) descTextareaRef.current = el;
+                          const cursor = el.selectionStart ?? el.value.length;
+                          const token = findMentionTokenAtCursor(el.value, cursor);
+                          const m = token ? mentionMatchFromToken(token) : findActiveMention(el.value, cursor);
+                          setDescMention(m);
+                          setDescMentionIndex(0);
+                        },
+                        onBlur: (e: React.FocusEvent<HTMLTextAreaElement>) => {
+                          const el = e.currentTarget;
+                          if (!descTextareaRef.current) descTextareaRef.current = el;
+                          // Small delay to allow click selection in dropdown.
+                          setTimeout(() => closeDescMentions(), 150);
+                        },
+                      }}
+                    />
+                    <MentionDropdown
+                      open={Boolean(descMention) && descMentionCandidates.length > 0}
+                      users={descMentionCandidates}
+                      activeIndex={descMentionIndex}
+                      onSelect={applyDescMention}
                     />
                     <div className="flex gap-2">
                       <Button
@@ -553,6 +837,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         variant="ghost"
                         onClick={() => {
                           setDescriptionDraft(ticket.description ?? '');
+                          descriptionDraftRef.current = ticket.description ?? '';
+                          setDescMentionTokens(parseMentionTokens(ticket.description ?? ''));
                           setIsEditingDescription(false);
                         }}
                       >
@@ -569,7 +855,9 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     )}
                   >
                     {ticket.description ? (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{ticket.description}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {linkifyMentionsMarkdown(ticket.description)}
+                      </ReactMarkdown>
                     ) : (
                       'Add a more detailed description...'
                     )}
@@ -777,9 +1065,46 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       <div className="flex-1 space-y-3">
                         <Textarea
                           value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
+                          ref={commentTextareaRef}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setNewComment(v);
+                            newCommentRef.current = v;
+                            const m = findActiveMention(v, e.target.selectionStart ?? v.length);
+                            setCommentMention(m);
+                            setCommentMentionIndex(0);
+                          }}
+                          onKeyDown={(e) => {
+                            if (!commentMention) return;
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              closeCommentMentions();
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              setCommentMentionIndex((i) => Math.min(i + 1, Math.max(0, commentMentionCandidates.length - 1)));
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              setCommentMentionIndex((i) => Math.max(i - 1, 0));
+                            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                              const picked = commentMentionCandidates[commentMentionIndex];
+                              if (picked) {
+                                e.preventDefault();
+                                applyCommentMention(picked);
+                              }
+                            }
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => closeCommentMentions(), 150);
+                          }}
                           placeholder="Write a comment..."
                           className="min-h-[80px] bg-[#282e33] border-[#9fadbc29]"
+                        />
+                        <MentionDropdown
+                          open={Boolean(commentMention) && commentMentionCandidates.length > 0}
+                          users={commentMentionCandidates}
+                          activeIndex={commentMentionIndex}
+                          onSelect={applyCommentMention}
+                          className="bg-[#282e33]"
                         />
                         {newComment.trim() && (
                           <Button
@@ -811,8 +1136,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           ) : null}
                           <div className="text-xs text-[#9fadbc]">{new Date(c.createdAt).toLocaleString()}</div>
                         </div>
-                        <div className="bg-[#282e33] border border-[#9fadbc29] rounded-lg p-3 text-sm">
-                          {c.content}
+                        <div className="bg-[#282e33] border border-[#9fadbc29] rounded-lg p-3 text-sm prose prose-invert prose-sm max-w-none">
+                          {renderCommentContent(c.content)}
                         </div>
                       </div>
                     </div>

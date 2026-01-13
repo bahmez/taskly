@@ -7,6 +7,7 @@ export type NotificationType =
   | 'ticket_assigned'
   | 'ticket_unassigned'
   | 'ticket_comment_added'
+  | 'ticket_mentioned'
   | 'ticket_attachment_uploaded'
   | 'ticket_reminder';
 

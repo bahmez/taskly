@@ -12,6 +12,86 @@ import {
   workspaceRolePermissions,
 } from '@taskly/shared';
 
+function extractMentionUserIdsFromLegacyMarkdown(text: string): string[] {
+  // Legacy mentions stored as markdown links: @[Label](user:<userId>)
+  const ids: string[] = [];
+  const re = /@\[([^\]]+)\]\(user:([^)]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const id = (m[2] ?? '').trim();
+    if (id) ids.push(id);
+  }
+  return Array.from(new Set(ids));
+}
+
+function extractMentionUsernames(text: string): string[] {
+  // Mentions stored as @username (avoid emails/mid-word by requiring start/whitespace before @)
+  const names: string[] = [];
+  const re = /(^|\s)@([a-zA-Z0-9._-]{1,50})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const username = (m[2] ?? '').trim();
+    if (username) names.push(username);
+  }
+  return Array.from(new Set(names));
+}
+
+async function resolveMentionUserIds(ctx: Context, workspaceId: string, text: string): Promise<string[]> {
+  const legacyIds = extractMentionUserIdsFromLegacyMarkdown(text);
+  const usernames = extractMentionUsernames(text);
+  if (legacyIds.length === 0 && usernames.length === 0) return [];
+
+  const members = await ctx.workspaces.listMembers(workspaceId);
+  const memberIds = members.map((m) => m.userId);
+  const allowedIds = new Set(memberIds);
+
+  // Resolve usernames to ids within the workspace.
+  const users = await Promise.all(memberIds.map((id) => ctx.users.getById(id)));
+  const usernameToId = new Map((users.filter(Boolean) as User[]).map((u) => [u.username, u.id]));
+
+  const resolvedFromNames: string[] = [];
+  for (const u of usernames) {
+    const id = usernameToId.get(u);
+    if (id) resolvedFromNames.push(id);
+  }
+
+  const all = Array.from(new Set([...legacyIds, ...resolvedFromNames]));
+  // Filter out anything outside workspace membership just in case.
+  return all.filter((id) => allowedIds.has(id));
+}
+
+async function diffMentionUserIds(ctx: Context, workspaceId: string, beforeText: string, afterText: string): Promise<string[]> {
+  const [beforeIds, afterIds] = await Promise.all([
+    resolveMentionUserIds(ctx, workspaceId, beforeText),
+    resolveMentionUserIds(ctx, workspaceId, afterText),
+  ]);
+  const before = new Set(beforeIds);
+  const added: string[] = [];
+  for (const id of afterIds) {
+    if (!before.has(id)) added.push(id);
+  }
+  return added;
+}
+
+async function requireMentionUsersInWorkspace(ctx: Context, workspaceId: string, text: string): Promise<void> {
+  const legacyIds = extractMentionUserIdsFromLegacyMarkdown(text);
+  const usernames = extractMentionUsernames(text);
+  if (legacyIds.length === 0 && usernames.length === 0) return;
+
+  const members = await ctx.workspaces.listMembers(workspaceId);
+  const allowedIds = new Set(members.map((m) => m.userId));
+
+  const invalidLegacy = legacyIds.filter((id) => !allowedIds.has(id));
+  if (invalidLegacy.length > 0) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid mention(s)' });
+
+  if (usernames.length > 0) {
+    const users = await Promise.all(members.map((m) => ctx.users.getById(m.userId)));
+    const allowedUsernames = new Set((users.filter(Boolean) as User[]).map((u) => u.username));
+    const invalidNames = usernames.filter((u) => !allowedUsernames.has(u));
+    if (invalidNames.length > 0) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid mention(s)' });
+  }
+}
+
 export type User = {
   id: string;
   username: string;
@@ -371,6 +451,7 @@ export type NotificationType =
   | 'ticket_assigned'
   | 'ticket_unassigned'
   | 'ticket_comment_added'
+  | 'ticket_mentioned'
   | 'ticket_attachment_uploaded'
   | 'ticket_reminder';
 
@@ -980,12 +1061,35 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        const { ticket: before } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
+        const { ticket: before, workspaceId } = await requireTicketPermission(ctx, input.ticketId, 'ticket.content.write');
         const patch: { title?: string; description?: string; dueDate?: string | null } = {};
         if (typeof input.title === 'string') patch.title = input.title.trim();
-        if (typeof input.description === 'string') patch.description = input.description;
+        if (typeof input.description === 'string') {
+          await requireMentionUsersInWorkspace(ctx, workspaceId, input.description);
+          patch.description = input.description;
+        }
         if (input.dueDate === null || typeof input.dueDate === 'string') patch.dueDate = input.dueDate;
         const updated = await ctx.tickets.update(input.ticketId, patch);
+
+        // Notify newly mentioned users in description (avoid spamming on unrelated updates)
+        if (typeof input.description === 'string') {
+          const added = await diffMentionUserIds(ctx, workspaceId, before.description ?? '', input.description);
+          const targets = added.filter((id) => id !== ctx.user!.id);
+          await Promise.all(
+            targets.map((userId) =>
+              safeNotify(
+                ctx.notifications.create(userId, {
+                  type: 'ticket_mentioned',
+                  title: `Mention dans "${before.title}"`,
+                  body: `Vous avez été mentionné dans la description.`,
+                  actorId: ctx.user!.id,
+                  data: { ticketId: before.id, boardId: before.boardId },
+                }),
+              ),
+            ),
+          );
+        }
+
         await safeLog(
           ctx.activityLogs.create(before.boardId, {
             ticketId: before.id,
@@ -1048,7 +1152,8 @@ export const appRouter = router({
       add: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), content: z.string().min(1).max(10000) }))
         .mutation(async ({ ctx, input }) => {
-          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          const { ticket, workspaceId } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          await requireMentionUsersInWorkspace(ctx, workspaceId, input.content);
           const comment = await ctx.tickets.addComment(input.ticketId, { authorId: ctx.user!.id, content: input.content.trim() });
 
           await safeLog(
@@ -1077,14 +1182,51 @@ export const appRouter = router({
             ),
           );
 
+          const mentioned = await resolveMentionUserIds(ctx, workspaceId, input.content);
+          const mentionTargets = mentioned.filter((id) => id !== ctx.user!.id);
+          await Promise.all(
+            mentionTargets.map((userId) =>
+              safeNotify(
+                ctx.notifications.create(userId, {
+                  type: 'ticket_mentioned',
+                  title: `Mention dans "${ticket.title}"`,
+                  body: snippet.length ? snippet : 'Vous avez été mentionné dans un commentaire.',
+                  actorId: ctx.user!.id,
+                  data: { ticketId: ticket.id, boardId: ticket.boardId, commentId: comment.id },
+                }),
+              ),
+            ),
+          );
+
           return comment;
         }),
 
       update: protectedProcedure
         .input(z.object({ ticketId: z.string().min(1), commentId: z.string().min(1), content: z.string().min(1).max(10000) }))
         .mutation(async ({ ctx, input }) => {
-          const { ticket } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          const { ticket, workspaceId } = await requireTicketPermission(ctx, input.ticketId, 'ticket.comments.write');
+          await requireMentionUsersInWorkspace(ctx, workspaceId, input.content);
+          const beforeComments = await ctx.tickets.listComments(input.ticketId);
+          const before = beforeComments.find((c) => c.id === input.commentId)?.content ?? '';
           const updated = await ctx.tickets.updateComment(input.ticketId, input.commentId, { content: input.content.trim() });
+
+          const added = await diffMentionUserIds(ctx, workspaceId, before, input.content);
+          const targets = added.filter((id) => id !== ctx.user!.id);
+          const snippet = input.content.trim().slice(0, 140);
+          await Promise.all(
+            targets.map((userId) =>
+              safeNotify(
+                ctx.notifications.create(userId, {
+                  type: 'ticket_mentioned',
+                  title: `Mention dans "${ticket.title}"`,
+                  body: snippet.length ? snippet : 'Vous avez été mentionné dans un commentaire.',
+                  actorId: ctx.user!.id,
+                  data: { ticketId: ticket.id, boardId: ticket.boardId, commentId: updated.id },
+                }),
+              ),
+            ),
+          );
+
           await safeLog(
             ctx.activityLogs.create(ticket.boardId, {
               ticketId: ticket.id,
