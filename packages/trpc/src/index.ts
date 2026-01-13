@@ -154,6 +154,19 @@ export type TicketAttachment = {
   updatedAt: string;
 };
 
+export type TicketReminder = {
+  id: string;
+  boardId: string;
+  ticketId: string;
+  userId: string;
+  remindAt: string;
+  remindAtMs: number;
+  createdAt: string;
+  updatedAt: string;
+  sentAt: string | null;
+  notificationIds: Record<string, string>;
+};
+
 export type SignedUrl = {
   url: string;
   method: 'PUT' | 'GET' | 'POST';
@@ -343,6 +356,12 @@ export type TicketsContext = {
   removeAttachment: (ticketId: string, attachmentId: string) => Promise<void>;
 };
 
+export type TicketRemindersContext = {
+  list: (ticketId: string, input: { userId: string }) => Promise<TicketReminder[]>;
+  create: (ticketId: string, input: { userId: string; remindAt: string }) => Promise<TicketReminder>;
+  remove: (ticketId: string, reminderId: string, input: { userId: string }) => Promise<void>;
+};
+
 export type NotificationType =
   | 'workspace_member_added'
   | 'workspace_member_role_updated'
@@ -352,7 +371,8 @@ export type NotificationType =
   | 'ticket_assigned'
   | 'ticket_unassigned'
   | 'ticket_comment_added'
-  | 'ticket_attachment_uploaded';
+  | 'ticket_attachment_uploaded'
+  | 'ticket_reminder';
 
 export type Notification = {
   id: string;
@@ -387,6 +407,7 @@ export type Context = {
   workspaces: WorkspacesContext;
   boards: BoardsContext;
   tickets: TicketsContext;
+  ticketReminders: TicketRemindersContext;
   notifications: NotificationsContext;
   activityLogs: ActivityLogsContext;
 };
@@ -991,6 +1012,30 @@ export const appRouter = router({
         );
         return { ok: true };
       }),
+
+    reminders: router({
+      list: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1) }))
+        .query(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          return await ctx.ticketReminders.list(input.ticketId, { userId: ctx.user!.id });
+        }),
+
+      create: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), remindAt: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          return await ctx.ticketReminders.create(input.ticketId, { userId: ctx.user!.id, remindAt: input.remindAt });
+        }),
+
+      remove: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1), reminderId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          await ctx.ticketReminders.remove(input.ticketId, input.reminderId, { userId: ctx.user!.id });
+          return { ok: true };
+        }),
+    }),
 
     comments: router({
       list: protectedProcedure

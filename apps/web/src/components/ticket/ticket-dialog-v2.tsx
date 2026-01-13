@@ -29,6 +29,9 @@ import {
   Plus,
   Edit3,
   FileText,
+  Calendar,
+  Bell,
+  Clock,
 } from 'lucide-react';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { PromptDialog } from '../ui/prompt-dialog';
@@ -79,9 +82,33 @@ function LabelChip({ name, color, onRemove }: { name: string; color: string; onR
   );
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function isoToDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function datetimeLocalToIso(local: string): string {
+  // "YYYY-MM-DDTHH:mm" interpreted in local timezone.
+  const d = new Date(local);
+  if (!Number.isFinite(d.getTime())) throw new Error('Invalid date');
+  return d.toISOString();
+}
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
 export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }: TicketDialogProps) {
   const { toast } = useToast();
   const utils = api.useUtils();
+  const activityListInput = React.useMemo(() => ({ ticketId, limit: 30, cursor: null as string | null }), [ticketId]);
 
   // Queries
   const ticketQuery = api.tickets.get.useQuery({ ticketId }, { enabled: open });
@@ -91,6 +118,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const assigneesQuery = api.tickets.assignees.list.useQuery({ ticketId }, { enabled: open });
   const labelsQuery = api.tickets.labels.list.useQuery({ ticketId }, { enabled: open });
   const boardLabelsQuery = api.boards.labels.list.useQuery({ boardId }, { enabled: open });
+  const remindersQuery = api.tickets.reminders.list.useQuery({ ticketId }, { enabled: open });
+  const ticketActivityQuery = api.tickets.activity.list.useQuery(activityListInput, { enabled: open });
 
   const ticket = ticketQuery.data;
   const permissions = ticket?.permissions;
@@ -130,14 +159,28 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     { enabled: open && workspaceMemberIds.length > 0 }
   );
 
+  const ticketActivity = ticketActivityQuery.data?.items ?? [];
+  const activityUserIds = React.useMemo(() => {
+    const ids: string[] = [];
+    for (const a of ticketActivity) {
+      if (a.actorId) ids.push(a.actorId);
+      const userId = (a.data as Record<string, unknown> | undefined)?.userId;
+      if (typeof userId === 'string' && userId) ids.push(userId);
+    }
+    return Array.from(new Set(ids));
+  }, [ticketActivity]);
+
+  const activityUsersQuery = api.users.byIds.useQuery({ ids: activityUserIds }, { enabled: open && activityUserIds.length > 0 });
+
   const usersById = React.useMemo(() => {
     const all = [
       ...(assigneesDetailsQuery.data ?? []),
       ...(commentAuthorsQuery.data ?? []),
       ...(workspaceMembersDetailsQuery.data ?? []),
+      ...(activityUsersQuery.data ?? []),
     ];
     return new Map(all.map((u) => [u.id, u]));
-  }, [assigneesDetailsQuery.data, commentAuthorsQuery.data, workspaceMembersDetailsQuery.data]);
+  }, [assigneesDetailsQuery.data, commentAuthorsQuery.data, workspaceMembersDetailsQuery.data, activityUsersQuery.data]);
 
   const formatUserPrimary = React.useCallback(
     (userId: string): string => {
@@ -188,7 +231,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
   const addComment = api.tickets.comments.add.useMutation({
     onSuccess: async () => {
-      await utils.tickets.comments.list.invalidate({ ticketId });
+      await Promise.all([utils.tickets.comments.list.invalidate({ ticketId }), utils.tickets.activity.list.invalidate(activityListInput)]);
       setNewComment('');
       toast({ title: 'Comment added' });
     },
@@ -316,6 +359,22 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     },
   });
 
+  const createReminder = api.tickets.reminders.create.useMutation({
+    onSuccess: async () => {
+      await utils.tickets.reminders.list.invalidate({ ticketId });
+      toast({ title: 'Reminder created' });
+    },
+    onError: (e) => toast({ title: 'Failed to create reminder', description: trpcErrorMessage(e), variant: 'destructive' }),
+  });
+
+  const removeReminder = api.tickets.reminders.remove.useMutation({
+    onSuccess: async () => {
+      await utils.tickets.reminders.list.invalidate({ ticketId });
+      toast({ title: 'Reminder removed' });
+    },
+    onError: (e) => toast({ title: 'Failed to remove reminder', description: trpcErrorMessage(e), variant: 'destructive' }),
+  });
+
   // Local state
   const [titleDraft, setTitleDraft] = React.useState('');
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
@@ -323,6 +382,9 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const [isEditingDescription, setIsEditingDescription] = React.useState(false);
   const [newComment, setNewComment] = React.useState('');
   const [newChecklistItemContent, setNewChecklistItemContent] = React.useState<Record<string, string>>({});
+  const [dueDateDraft, setDueDateDraft] = React.useState('');
+  const [reminderDraft, setReminderDraft] = React.useState('');
+  const [ticketFeedView, setTicketFeedView] = React.useState<'comments' | 'history'>('comments');
 
   // Dialog states
   const [confirmDialog, setConfirmDialog] = React.useState<{ open: boolean; title: string; description?: string; onConfirm: () => void }>({
@@ -337,20 +399,36 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   });
   const [memberSelectOpen, setMemberSelectOpen] = React.useState(false);
   const [labelManagerOpen, setLabelManagerOpen] = React.useState(false);
+  const [dueDateModalOpen, setDueDateModalOpen] = React.useState(false);
+  const [reminderModalOpen, setReminderModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (ticket) {
       setTitleDraft(ticket.title);
       setDescriptionDraft(ticket.description ?? '');
+      setDueDateDraft(ticket.dueDate ? isoToDatetimeLocal(ticket.dueDate) : '');
     }
   }, [ticket]);
+
+  React.useEffect(() => {
+    if (open) setTicketFeedView('comments');
+  }, [open]);
 
   const canEdit = permissions?.canContentWrite ?? false;
   const canComment = permissions?.canCommentsWrite ?? false;
   const canAssign = permissions?.canAssignmentsWrite ?? false;
 
+  const reminders = remindersQuery.data ?? [];
+  const canCreateReminder = Boolean(open); // reminders are user-scoped; permission check is server-side (ticket.content.read)
+
+  const dueDateIso = ticket?.dueDate ?? null;
+  const dueMs = dueDateIso ? Date.parse(dueDateIso) : NaN;
+  const isDueValid = Number.isFinite(dueMs);
+  const isOverdue = isDueValid ? dueMs < Date.now() : false;
+
   const boardLabels = boardLabelsQuery.data ?? [];
   const ticketLabelIds = labelsQuery.data?.labelIds ?? [];
+  const labelById = React.useMemo(() => new Map(boardLabels.map((l) => [l.id, l])), [boardLabels]);
 
   if (!ticket) {
     return (
@@ -668,10 +746,28 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <MessageSquare className="h-5 w-5 text-[#9fadbc]" />
-                  <h3 className="text-sm font-semibold text-[#b6c2cf]">Activity</h3>
+                  <h3 className="text-sm font-semibold text-[#b6c2cf]">
+                    {ticketFeedView === 'history' ? 'Activity' : 'Comments'}
+                  </h3>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={ticketFeedView === 'comments' ? 'trello' : 'ghost'}
+                      onClick={() => setTicketFeedView('comments')}
+                    >
+                      Comments
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={ticketFeedView === 'history' ? 'trello' : 'ghost'}
+                      onClick={() => setTicketFeedView('history')}
+                    >
+                      History
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-4">
-                  {canComment && (
+                  {ticketFeedView === 'comments' && canComment && (
                     <div className="flex gap-3">
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarFallback className="bg-[#44546f] text-white text-xs">
@@ -699,7 +795,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     </div>
                   )}
 
-                  {commentsQuery.data?.map((c) => (
+                  {ticketFeedView === 'comments' &&
+                    commentsQuery.data?.map((c) => (
                     <div key={c.id} className="flex gap-3">
                       <Avatar className="h-9 w-9 shrink-0">
                         <AvatarFallback className="bg-[#44546f] text-white text-xs">
@@ -720,12 +817,204 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       </div>
                     </div>
                   ))}
+
+                  {ticketFeedView === 'history' && (
+                    <div className="space-y-2">
+                      {ticketActivity.length === 0 ? (
+                        <div className="text-xs text-[#9fadbc]">No activity yet.</div>
+                      ) : (
+                        ticketActivity.map((a) => {
+                          const actor = a.actorId ? formatUserPrimary(a.actorId) : 'System';
+                          const data = a.data as Record<string, unknown>;
+                          const userId = typeof data?.userId === 'string' ? data.userId : null;
+                          const labelId = typeof data?.labelId === 'string' ? data.labelId : null;
+
+                          let label: string = a.type;
+                          switch (a.type) {
+                            case 'ticket_created':
+                              label = 'Ticket created';
+                              break;
+                            case 'ticket_updated':
+                              label = 'Ticket updated';
+                              break;
+                            case 'ticket_moved':
+                              label = 'Ticket moved';
+                              break;
+                            case 'ticket_archived':
+                              label = 'Ticket archived';
+                              break;
+                            case 'ticket_comment_added':
+                              label = 'Comment added';
+                              break;
+                            case 'ticket_comment_updated':
+                              label = 'Comment updated';
+                              break;
+                            case 'ticket_comment_deleted':
+                              label = 'Comment deleted';
+                              break;
+                            case 'ticket_assignee_added':
+                              label = `Assignee added${userId ? `: ${formatUserPrimary(userId)}` : ''}`;
+                              break;
+                            case 'ticket_assignee_removed':
+                              label = `Assignee removed${userId ? `: ${formatUserPrimary(userId)}` : ''}`;
+                              break;
+                            case 'ticket_label_added': {
+                              const name = labelId ? labelById.get(labelId)?.name : null;
+                              label = `Label added${name ? `: ${name}` : ''}`;
+                              break;
+                            }
+                            case 'ticket_label_removed': {
+                              const name = labelId ? labelById.get(labelId)?.name : null;
+                              label = `Label removed${name ? `: ${name}` : ''}`;
+                              break;
+                            }
+                            case 'ticket_checklist_created':
+                              label = 'Checklist created';
+                              break;
+                            case 'ticket_checklist_updated':
+                              label = 'Checklist updated';
+                              break;
+                            case 'ticket_checklist_deleted':
+                              label = 'Checklist deleted';
+                              break;
+                            case 'ticket_checklist_item_added':
+                              label = 'Checklist item added';
+                              break;
+                            case 'ticket_checklist_item_updated':
+                              label = 'Checklist item updated';
+                              break;
+                            case 'ticket_checklist_item_deleted':
+                              label = 'Checklist item deleted';
+                              break;
+                            case 'ticket_attachment_upload_created':
+                              label = 'Attachment upload started';
+                              break;
+                            case 'ticket_attachment_uploaded':
+                              label = 'Attachment uploaded';
+                              break;
+                            case 'ticket_attachment_removed':
+                              label = 'Attachment removed';
+                              break;
+                          }
+
+                          return (
+                            <div key={a.id} className="flex items-start gap-3 bg-[#282e33] border border-[#9fadbc29] rounded-lg p-3">
+                              <div className="h-9 w-9 shrink-0 rounded bg-[#1d2125] border border-[#9fadbc29] flex items-center justify-center">
+                                <Clock className="h-4 w-4 text-[#9fadbc]" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold">{label}</div>
+                                <div className="text-xs text-[#9fadbc] mt-1">
+                                  {actor} • {new Date(a.createdAt).toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Sidebar */}
             <div className="w-full lg:w-56 shrink-0 space-y-6">
+              {/* Due date */}
+              <div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Due date</div>
+                <div className="space-y-2">
+                  {dueDateIso ? (
+                    <div
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border px-3 py-2 bg-[#282e33]',
+                        isOverdue ? 'border-red-500/40' : 'border-[#9fadbc29]',
+                      )}
+                    >
+                      <Calendar className={cn('h-4 w-4', isOverdue ? 'text-red-300' : 'text-[#9fadbc]')} />
+                      <div className="min-w-0 flex-1">
+                        <div className={cn('text-xs font-semibold truncate', isOverdue ? 'text-red-200' : 'text-[#b6c2cf]')}>
+                          {formatDateTime(dueDateIso)}
+                        </div>
+                        <div className="text-[11px] text-[#9fadbc]">{isOverdue ? 'Overdue' : 'Due'}</div>
+                      </div>
+                      {canEdit && (
+                        <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setDueDateModalOpen(true)}>
+                          Edit
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-[#9fadbc]">No due date.</div>
+                  )}
+
+                  {canEdit && (
+                    <Button size="sm" variant="ghost" className="w-full justify-start h-9" onClick={() => setDueDateModalOpen(true)}>
+                      <Calendar className="h-4 w-4 mr-3" />
+                      {dueDateIso ? 'Change due date' : 'Set due date'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <Separator className="bg-[#9fadbc29]" />
+
+              {/* Reminders */}
+              <div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Reminders</div>
+                <div className="space-y-3">
+                  {/* List */}
+                  {reminders.length > 0 ? (
+                    <div className="space-y-2">
+                      {reminders.map((r) => {
+                        const isSent = Boolean(r.sentAt);
+                        return (
+                          <div
+                            key={r.id}
+                            className="flex items-center gap-2 rounded-lg bg-[#282e33] border border-[#9fadbc29] px-3 py-2"
+                          >
+                            <Bell className={cn('h-4 w-4', isSent ? 'text-[#9fadbc]' : 'text-[#0c66e4]')} />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium truncate">
+                                {formatDateTime(r.remindAt)}
+                              </div>
+                              <div className="text-[11px] text-[#9fadbc]">
+                                {isSent ? `Sent ${formatDateTime(r.sentAt!)}` : 'Pending'}
+                              </div>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => removeReminder.mutate({ ticketId, reminderId: r.id })}
+                              disabled={removeReminder.isPending}
+                              aria-label="Remove reminder"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-[#9fadbc]">No reminders yet.</div>
+                  )}
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full justify-start h-9"
+                    disabled={!canCreateReminder}
+                    onClick={() => setReminderModalOpen(true)}
+                  >
+                    <Bell className="h-4 w-4 mr-3" />
+                    Add reminder
+                  </Button>
+                </div>
+              </div>
+
+              <Separator className="bg-[#9fadbc29]" />
+
               {/* Add to card */}
               <div>
                 <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Add to card</div>
@@ -936,6 +1225,135 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
           });
         }}
       />
+
+      {/* Due date modal */}
+      <Dialog open={dueDateModalOpen} onOpenChange={setDueDateModalOpen}>
+        <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-[#9fadbc]" />
+              <div className="text-sm font-semibold">Set due date</div>
+            </div>
+            <Input
+              type="datetime-local"
+              value={dueDateDraft}
+              onChange={(e) => setDueDateDraft(e.target.value)}
+              disabled={!canEdit}
+              className="h-10"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="trello"
+                className="flex-1"
+                disabled={!canEdit || updateTicket.isPending}
+                onClick={() => {
+                  try {
+                    const iso = dueDateDraft ? datetimeLocalToIso(dueDateDraft) : null;
+                    updateTicket.mutate({ ticketId, dueDate: iso });
+                    setDueDateModalOpen(false);
+                  } catch {
+                    toast({ title: 'Invalid date', variant: 'destructive' });
+                  }
+                }}
+              >
+                Save
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!canEdit || updateTicket.isPending}
+                onClick={() => {
+                  setDueDateDraft('');
+                  updateTicket.mutate({ ticketId, dueDate: null });
+                  setDueDateModalOpen(false);
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+            {dueDateIso && <div className="text-xs text-[#9fadbc]">Current: {formatDateTime(dueDateIso)}</div>}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reminder modal */}
+      <Dialog open={reminderModalOpen} onOpenChange={setReminderModalOpen}>
+        <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Bell className="h-5 w-5 text-[#9fadbc]" />
+              <div className="text-sm font-semibold">Add reminder</div>
+            </div>
+            <Input
+              type="datetime-local"
+              value={reminderDraft}
+              onChange={(e) => setReminderDraft(e.target.value)}
+              disabled={!canCreateReminder}
+              className="h-10"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="trello"
+                className="flex-1"
+                disabled={!canCreateReminder || !reminderDraft || createReminder.isPending}
+                onClick={() => {
+                  try {
+                    const iso = datetimeLocalToIso(reminderDraft);
+                    createReminder.mutate({ ticketId, remindAt: iso });
+                    setReminderDraft('');
+                    setReminderModalOpen(false);
+                  } catch {
+                    toast({ title: 'Invalid reminder date', variant: 'destructive' });
+                  }
+                }}
+              >
+                Create
+              </Button>
+              <Button variant="ghost" onClick={() => setReminderModalOpen(false)} disabled={createReminder.isPending}>
+                Cancel
+              </Button>
+            </div>
+
+            <Separator className="bg-[#9fadbc29]" />
+
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-[#9fadbc] uppercase tracking-wide">Presets</div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1"
+                  disabled={!ticket.dueDate || createReminder.isPending}
+                  onClick={() => {
+                    if (!ticket.dueDate) return;
+                    const due = new Date(ticket.dueDate).getTime();
+                    const remindAt = new Date(due - 60 * 60_000).toISOString(); // 1h before
+                    createReminder.mutate({ ticketId, remindAt });
+                    setReminderModalOpen(false);
+                  }}
+                >
+                  1h before due
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1"
+                  disabled={!ticket.dueDate || createReminder.isPending}
+                  onClick={() => {
+                    if (!ticket.dueDate) return;
+                    const due = new Date(ticket.dueDate).getTime();
+                    const remindAt = new Date(due - 24 * 60 * 60_000).toISOString(); // 1d before
+                    createReminder.mutate({ ticketId, remindAt });
+                    setReminderModalOpen(false);
+                  }}
+                >
+                  1d before due
+                </Button>
+              </div>
+              {!ticket.dueDate && <div className="text-xs text-[#9fadbc]">Set a due date to use presets.</div>}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -12,6 +12,7 @@ import {
   ActivityLogsService,
   BoardsService,
   NotificationsService,
+  TicketRemindersService,
   TicketsService,
   UsersService,
   WorkspacesService,
@@ -77,6 +78,7 @@ async function bootstrap() {
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
   const ticketsService = app.get(TicketsService);
+  const ticketRemindersService = app.get(TicketRemindersService);
   const notificationsService = app.get(NotificationsService);
   const activityLogsService = app.get(ActivityLogsService);
   const gcsService = app.get(GcsService);
@@ -264,6 +266,14 @@ async function bootstrap() {
           markAllRead: notificationsService.markAllRead.bind(notificationsService),
         };
 
+        const ticketReminders = {
+          list: (ticketId: string, input: { userId: string }) => ticketRemindersService.listForUser(ticketId, input.userId),
+          create: (ticketId: string, input: { userId: string; remindAt: string }) =>
+            ticketRemindersService.createForUser(ticketId, { userId: input.userId, remindAt: input.remindAt }),
+          remove: (ticketId: string, reminderId: string, input: { userId: string }) =>
+            ticketRemindersService.removeForUser(ticketId, reminderId, input.userId),
+        };
+
         const activityLogs = {
           create: activityLogsService.create.bind(activityLogsService),
           listForBoard: activityLogsService.listForBoard.bind(activityLogsService),
@@ -271,20 +281,20 @@ async function bootstrap() {
         };
 
         if (!token) {
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications, activityLogs };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null), ticketReminders, notifications, activityLogs };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards, tickets: makeTickets(user.id), notifications, activityLogs };
+          return { user, users, workspaces, boards, tickets: makeTickets(user.id), ticketReminders, notifications, activityLogs };
         } catch (e) {
           if (process.env.NODE_ENV !== 'production') {
             const err = e as { message?: string; code?: string };
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), notifications, activityLogs };
+          return { user: null, users, workspaces, boards, tickets: makeTickets(null), ticketReminders, notifications, activityLogs };
         }
       },
     }),
