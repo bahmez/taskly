@@ -34,6 +34,13 @@ function initialsFrom(s: string) {
   return (a + b).toUpperCase()
 }
 
+function formatNotificationTime(input: { createdAt?: string; createdAtMs?: number }) {
+  const ms = Number.isFinite(input.createdAtMs) ? (input.createdAtMs as number) : undefined
+  const date = ms ? new Date(ms) : input.createdAt ? new Date(input.createdAt) : null
+  if (!date || Number.isNaN(date.getTime())) return ""
+  return date.toLocaleString()
+}
+
 export function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
@@ -67,6 +74,33 @@ export function Navbar() {
 
   const [displayName, setDisplayName] = React.useState("")
   const [photoURL, setPhotoURL] = React.useState("")
+
+  const notificationsQuery = api.notifications.list.useQuery({ limit: 6 })
+  const unreadCountQuery = api.notifications.unreadCount.useQuery()
+  const markRead = api.notifications.markRead.useMutation({
+    onSuccess: async () => {
+      await utils.notifications.list.invalidate()
+      await utils.notifications.unreadCount.invalidate()
+    },
+  })
+  const markAllRead = api.notifications.markAllRead.useMutation({
+    onSuccess: async () => {
+      await utils.notifications.list.invalidate()
+      await utils.notifications.unreadCount.invalidate()
+    },
+  })
+
+  const notifications = notificationsQuery.data?.items ?? []
+  const unreadCount = unreadCountQuery.data?.count ?? 0
+
+  const notificationHref = (n: (typeof notifications)[number]) => {
+    const data = n.data ?? {}
+    const boardId = typeof data.boardId === "string" ? data.boardId : null
+    if (boardId) return `/dashboard/boards/${boardId}`
+    const workspaceId = typeof data.workspaceId === "string" ? data.workspaceId : null
+    if (workspaceId) return `/dashboard/workspaces/${workspaceId}`
+    return null
+  }
 
   React.useEffect(() => {
     const me = meQuery.data
@@ -247,13 +281,80 @@ export function Navbar() {
           />
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] rounded-full"
-        >
-          <Bell className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] rounded-full"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 ? (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-[#f87171] text-[10px] font-semibold text-white flex items-center justify-center px-1">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-96">
+            <div className="flex items-center justify-between px-3 py-2">
+              <div className="text-sm font-semibold text-[#b6c2cf]">Notifications</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-[#9fadbc] hover:bg-[#a6c5e229]"
+                disabled={unreadCount === 0 || markAllRead.isPending}
+                onClick={() => markAllRead.mutate()}
+              >
+                Tout marquer comme lu
+              </Button>
+            </div>
+            <DropdownMenuSeparator />
+
+            {notificationsQuery.isLoading ? (
+              <div className="px-3 py-3 text-sm text-[#9fadbc]">Chargement…</div>
+            ) : notifications.length === 0 ? (
+              <div className="px-3 py-6 text-sm text-[#9fadbc]">Aucune notification pour le moment.</div>
+            ) : (
+              <div className="max-h-[360px] overflow-y-auto">
+                {notifications.map((n) => {
+                  const href = notificationHref(n)
+                  const isUnread = !n.readAt
+                  return (
+                    <DropdownMenuItem
+                      key={n.id}
+                      className="items-start gap-2 py-2"
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        if (isUnread) markRead.mutate({ id: n.id })
+                        if (href) router.push(href)
+                      }}
+                    >
+                      <div className="mt-1 h-2 w-2 rounded-full bg-[#579dff]" style={{ opacity: isUnread ? 1 : 0 }} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-[#b6c2cf] truncate">{n.title}</div>
+                        {n.body ? <div className="text-xs text-[#9fadbc] line-clamp-2">{n.body}</div> : null}
+                        <div className="text-[11px] text-[#7c8a97] mt-1">
+                          {formatNotificationTime({ createdAt: n.createdAt, createdAtMs: n.createdAtMs })}
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </div>
+            )}
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault()
+                router.push("/dashboard/notifications")
+              }}
+            >
+              Voir plus
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Button
           variant="ghost"
