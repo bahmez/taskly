@@ -200,6 +200,9 @@ async function bootstrap() {
           getAssigneeIds: ticketsService.getAssigneeIds.bind(ticketsService),
           addAssignee: ticketsService.addAssignee.bind(ticketsService),
           removeAssignee: ticketsService.removeAssignee.bind(ticketsService),
+          getWatchStatus: ticketsService.getWatchStatus.bind(ticketsService),
+          setWatchStatus: ticketsService.setWatchStatus.bind(ticketsService),
+          listWatchUserIds: ticketsService.listWatchUserIds.bind(ticketsService),
 
           getLabelIds: ticketsService.getLabelIds.bind(ticketsService),
           addLabel: ticketsService.addLabel.bind(ticketsService),

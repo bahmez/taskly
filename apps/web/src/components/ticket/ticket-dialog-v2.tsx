@@ -131,6 +131,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const boardLabelsQuery = api.boards.labels.list.useQuery({ boardId }, { enabled: open });
   const remindersQuery = api.tickets.reminders.list.useQuery({ ticketId }, { enabled: open });
   const ticketActivityQuery = api.tickets.activity.list.useQuery(activityListInput, { enabled: open });
+  const watchQuery = api.tickets.watch.get.useQuery({ ticketId }, { enabled: open });
 
   const ticket = ticketQuery.data;
   const permissions = ticket?.permissions;
@@ -618,6 +619,22 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     onError: (e) => toast({ title: 'Failed to remove reminder', description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
+  const watchTicket = api.tickets.watch.watch.useMutation({
+    onSuccess: async () => {
+      await utils.tickets.watch.get.invalidate({ ticketId });
+      toast({ title: 'Watching this ticket' });
+    },
+    onError: (e) => toast({ title: 'Failed to watch ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
+  });
+
+  const unwatchTicket = api.tickets.watch.unwatch.useMutation({
+    onSuccess: async () => {
+      await utils.tickets.watch.get.invalidate({ ticketId });
+      toast({ title: 'Unwatched this ticket' });
+    },
+    onError: (e) => toast({ title: 'Failed to unwatch ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
+  });
+
   // Local state
   const [titleDraft, setTitleDraft] = React.useState('');
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
@@ -664,6 +681,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
   const reminders = remindersQuery.data ?? [];
   const canCreateReminder = Boolean(open); // reminders are user-scoped; permission check is server-side (ticket.content.read)
+  const isWatching = watchQuery.data?.isWatching ?? false;
+  const watchBusy = watchQuery.isLoading || watchTicket.isPending || unwatchTicket.isPending;
 
   const dueDateIso = ticket?.dueDate ?? null;
   const dueMs = dueDateIso ? Date.parse(dueDateIso) : NaN;
@@ -1296,6 +1315,23 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     </Button>
                   )}
                 </div>
+              </div>
+
+              <Separator className="bg-[#9fadbc29]" />
+
+              {/* Watch / Unwatch */}
+              <div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Notifications</div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="w-full justify-start h-9"
+                  disabled={watchBusy}
+                  onClick={() => (isWatching ? unwatchTicket.mutate({ ticketId }) : watchTicket.mutate({ ticketId }))}
+                >
+                  <Bell className={cn('h-4 w-4 mr-3', isWatching ? 'text-[#0c66e4]' : 'text-[#9fadbc]')} />
+                  {isWatching ? 'Unwatch' : 'Watch'}
+                </Button>
               </div>
 
               <Separator className="bg-[#9fadbc29]" />

@@ -405,6 +405,9 @@ export type TicketsContext = {
   getAssigneeIds: (ticketId: string) => Promise<string[]>;
   addAssignee: (ticketId: string, userId: string) => Promise<void>;
   removeAssignee: (ticketId: string, userId: string) => Promise<void>;
+  getWatchStatus: (ticketId: string, userId: string) => Promise<{ isWatching: boolean; isExplicit: boolean }>;
+  setWatchStatus: (ticketId: string, userId: string, watch: boolean) => Promise<void>;
+  listWatchUserIds: (ticketId: string) => Promise<string[]>;
 
   getLabelIds: (ticketId: string) => Promise<string[]>;
   addLabel: (ticketId: string, labelId: string) => Promise<void>;
@@ -1165,8 +1168,8 @@ export const appRouter = router({
             }),
           );
 
-          const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
-          const targets = assigneeIds.filter((id) => id !== ctx.user!.id);
+          const watcherIds = await ctx.tickets.listWatchUserIds(input.ticketId);
+          const targets = watcherIds.filter((id) => id !== ctx.user!.id);
           const snippet = input.content.trim().slice(0, 140);
           await Promise.all(
             targets.map((userId) =>
@@ -1317,6 +1320,31 @@ export const appRouter = router({
               }),
             );
           }
+          return { ok: true };
+        }),
+    }),
+
+    watch: router({
+      get: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1) }))
+        .query(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          return await ctx.tickets.getWatchStatus(input.ticketId, ctx.user!.id);
+        }),
+
+      watch: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          await ctx.tickets.setWatchStatus(input.ticketId, ctx.user!.id, true);
+          return { ok: true };
+        }),
+
+      unwatch: protectedProcedure
+        .input(z.object({ ticketId: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          await requireTicketPermission(ctx, input.ticketId, 'ticket.content.read');
+          await ctx.tickets.setWatchStatus(input.ticketId, ctx.user!.id, false);
           return { ok: true };
         }),
     }),
@@ -1564,8 +1592,8 @@ export const appRouter = router({
             }),
           );
 
-          const assigneeIds = await ctx.tickets.getAssigneeIds(input.ticketId);
-          const targets = assigneeIds.filter((id) => id !== ctx.user!.id);
+          const watcherIds = await ctx.tickets.listWatchUserIds(input.ticketId);
+          const targets = watcherIds.filter((id) => id !== ctx.user!.id);
           await Promise.all(
             targets.map((userId) =>
               safeNotify(

@@ -53,6 +53,26 @@ export class TicketsService {
     return this.store.removeAssignee(ticketId, userId);
   }
 
+  async getWatchStatus(ticketId: string, userId: string): Promise<{ isWatching: boolean; isExplicit: boolean }> {
+    const [assignees, override] = await Promise.all([this.store.getAssigneeIds(ticketId), this.store.getWatchOverride(ticketId, userId)]);
+    const isWatching = override?.watch ?? assignees.includes(userId);
+    return { isWatching, isExplicit: Boolean(override) };
+  }
+
+  setWatchStatus(ticketId: string, userId: string, watch: boolean): Promise<void> {
+    return this.store.setWatchOverride(ticketId, userId, watch);
+  }
+
+  async listWatchUserIds(ticketId: string): Promise<string[]> {
+    const [assignees, overrides] = await Promise.all([this.store.getAssigneeIds(ticketId), this.store.listWatchOverrides(ticketId)]);
+    const watchers = new Set(assignees);
+    for (const o of overrides) {
+      if (o.watch) watchers.add(o.userId);
+      else watchers.delete(o.userId);
+    }
+    return Array.from(watchers);
+  }
+
   // Labels
   getLabelIds(ticketId: string): Promise<string[]> {
     return this.store.getLabelIds(ticketId);
