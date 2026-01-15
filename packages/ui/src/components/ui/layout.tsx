@@ -1,24 +1,5 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
-
-const sheetVariants = cva(
-  "fixed inset-0 z-50 flex flex-col transition-all data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-  {
-    variants: {
-      side: {
-        top: "border-b bg-background",
-        bottom: "border-t bg-background",
-        left: "border-r bg-background",
-        right: "border-l bg-background",
-      },
-    },
-    defaultVariants: {
-      side: "left",
-    },
-  }
-)
 
 // Simplified Shell component for the main app structure
 const Shell = React.forwardRef<

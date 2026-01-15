@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { BoardModel, UserModel, WorkspaceRole } from '@taskly/database';
+import type { BoardModel, WorkspaceRole } from '@taskly/database';
 import { BoardsService, WorkspacesService } from '@taskly/database';
 import { boardRolePermissions, hasPermission } from '@taskly/shared';
 

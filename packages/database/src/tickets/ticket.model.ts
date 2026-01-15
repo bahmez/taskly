@@ -69,4 +69,11 @@ export type TicketAttachmentModel = {
   updatedAt: string;
 };
 
+export type TicketWatchOverrideModel = {
+  userId: string;
+  watch: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 

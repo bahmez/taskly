@@ -2,15 +2,21 @@
   "name": "@taskly/web",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rimraf .next"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@mdxeditor/editor": "^3.52.3",
     "@tanstack/react-query": "^5.51.23",
     "@taskly/trpc": "workspace:*",
@@ -29,14 +35,19 @@
     "superjson": "^2.2.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.11.30",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
     "eslint-config-next": "^14.2.25",
+    "happy-dom": "^20.1.0",
     "postcss": "^8.4.38",
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^4.0.16"
   }
 }
