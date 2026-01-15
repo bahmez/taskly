@@ -18,21 +18,17 @@ import {
   DialogTitle,
   DialogTrigger,
   Textarea,
+  useToast,
 } from "@taskly/ui"
-import { Grid, Search, Bell, HelpCircle, Plus } from "lucide-react"
+import { Grid, Search, Bell, HelpCircle, Plus, Upload } from "lucide-react"
 import { api } from "@/app/trpc"
 import { useWorkspaceUI } from "@/components/workspace/workspace-ui-provider"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/auth/auth-provider"
 import { getFirebaseAuth } from "@/lib/firebase/firebase-client"
 import { updateProfile } from "firebase/auth"
+import { UserAvatar } from "@/components/user/user-avatar"
 
-function initialsFrom(s: string) {
-  const parts = (s ?? "").trim().split(/\s+/).filter(Boolean)
-  const a = parts[0]?.[0] ?? "?"
-  const b = parts.length > 1 ? parts[parts.length - 1]?.[0] : ""
-  return (a + b).toUpperCase()
-}
 
 function formatNotificationTime(input: { createdAt?: string; createdAtMs?: number }) {
   const ms = Number.isFinite(input.createdAtMs) ? (input.createdAtMs as number) : undefined
@@ -46,6 +42,7 @@ export function Navbar() {
   const pathname = usePathname()
   const isDashboardOverview = pathname === "/dashboard" || pathname === "/workspaces"
   const utils = api.useUtils()
+  const { toast } = useToast()
   const { workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useWorkspaceUI()
   const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId) ?? null
   const { user: firebaseUser, logout } = useAuth()
@@ -54,6 +51,32 @@ export function Navbar() {
   const updateMe = api.users.updateMe.useMutation({
     onSuccess: async () => {
       await utils.users.me.invalidate()
+    },
+  })
+
+  const setAvatarBackground = api.users.avatar.setInitialsBackground.useMutation({
+    onSuccess: async () => {
+      await utils.users.me.invalidate()
+      await utils.users.byIds.invalidate()
+      await utils.users.byId.invalidate()
+    },
+  })
+
+  const clearAvatar = api.users.avatar.clear.useMutation({
+    onSuccess: async () => {
+      await utils.users.me.invalidate()
+      await utils.users.byIds.invalidate()
+      await utils.users.byId.invalidate()
+    },
+  })
+
+  const createAvatarUpload = api.users.avatar.createUpload.useMutation()
+  const completeAvatarUpload = api.users.avatar.completeUpload.useMutation({
+    onSuccess: async () => {
+      await utils.users.me.invalidate()
+      await utils.users.byIds.invalidate()
+      await utils.users.byId.invalidate()
+      toast({ title: "Photo updated" })
     },
   })
 
@@ -73,7 +96,22 @@ export function Navbar() {
   const [description, setDescription] = React.useState("")
 
   const [displayName, setDisplayName] = React.useState("")
-  const [photoURL, setPhotoURL] = React.useState("")
+  const [avatarOpen, setAvatarOpen] = React.useState(false)
+  const [avatarTab, setAvatarTab] = React.useState<"color" | "gradient" | "image" | "upload">("color")
+  const [avatarSearch, setAvatarSearch] = React.useState("")
+
+  const avatarSearchValue = avatarSearch.trim()
+  const avatarBackgroundsQuery = api.boards.listBackgrounds.useInfiniteQuery(
+    {
+      type: avatarTab === "upload" ? "color" : avatarTab,
+      limit: 12,
+      query: avatarTab === "image" && avatarSearchValue ? avatarSearchValue : undefined,
+    },
+    {
+      enabled: avatarOpen && avatarTab !== "upload",
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    },
+  )
 
   const notificationsQuery = api.notifications.list.useQuery({ limit: 6 })
   const unreadCountQuery = api.notifications.unreadCount.useQuery()
@@ -113,8 +151,7 @@ export function Navbar() {
 
   React.useEffect(() => {
     setDisplayName(firebaseUser?.displayName ?? "")
-    setPhotoURL(firebaseUser?.photoURL ?? "")
-  }, [firebaseUser?.uid, firebaseUser?.displayName, firebaseUser?.photoURL])
+  }, [firebaseUser?.uid, firebaseUser?.displayName])
 
   const goToWorkspace = (workspaceId: string) => {
     setSelectedWorkspaceId(workspaceId)
@@ -141,6 +178,52 @@ export function Navbar() {
 
   const [createBoardOpen, setCreateBoardOpen] = React.useState(false)
   const [boardTitle, setBoardTitle] = React.useState("")
+
+  const me = meQuery.data
+  const avatarBackgroundItems = avatarBackgroundsQuery.data?.pages.flatMap((p) => p.items) ?? []
+  const avatarUploading = createAvatarUpload.isPending || completeAvatarUpload.isPending
+
+  const onUploadAvatarFile = React.useCallback(
+    async (file: File) => {
+      let objectPath: string | null = null
+      try {
+        toast({ title: "Uploading..." })
+        const res = await createAvatarUpload.mutateAsync({
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+          resumable: false,
+        })
+        objectPath = res.objectPath
+        const putRes = await fetch(res.upload.url, {
+          method: res.upload.method,
+          headers: res.upload.headers,
+          body: file,
+        })
+        if (!putRes.ok) {
+          let bodyText = ""
+          try {
+            bodyText = await putRes.text()
+          } catch {
+            // ignore
+          }
+          throw new Error(`GCS upload failed (${putRes.status}): ${bodyText || putRes.statusText || "Unknown error"}`)
+        }
+        await completeAvatarUpload.mutateAsync({ objectPath })
+        setAvatarOpen(false)
+      } catch (err) {
+        const error = err as Error
+        toast({
+          title: "Upload failed",
+          description: error.message.includes("client_email")
+            ? "GCS credentials not configured"
+            : error.message ||
+              "Failed to upload file. If you see a CORS error in the console, update bucket CORS for your origin.",
+          variant: "destructive",
+        })
+      }
+    },
+    [createAvatarUpload, completeAvatarUpload, toast, setAvatarOpen],
+  )
 
   return (
     <Header className="h-12 bg-[#1d2125] border-b border-[#9fadbc29] px-4 flex items-center justify-between backdrop-blur-none supports-[backdrop-filter]:bg-[#1d2125]">
@@ -369,17 +452,10 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full bg-[#0055cc] text-white hover:opacity-90 overflow-hidden"
+              className="h-8 w-8 rounded-full text-white hover:opacity-90 overflow-hidden"
               title="Account"
             >
-              {firebaseUser?.photoURL ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={firebaseUser.photoURL} alt="avatar" className="h-8 w-8 object-cover" />
-              ) : (
-                <span className="text-xs font-bold">
-                  {initialsFrom(meQuery.data?.username || firebaseUser?.displayName || firebaseUser?.email || "User")}
-                </span>
-              )}
+              <UserAvatar user={me ?? { username: firebaseUser?.displayName ?? firebaseUser?.email ?? "User" }} className="h-8 w-8" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72">
@@ -405,13 +481,125 @@ export function Navbar() {
                     <div className="text-sm text-[#b6c2cf]">ID: {firebaseUser?.uid ?? "-"}</div>
                   </div>
 
+                  <div className="flex items-center gap-3">
+                    <UserAvatar user={me ?? { username: firebaseUser?.displayName ?? firebaseUser?.email ?? "User" }} className="h-12 w-12" />
+                    <div className="flex-1">
+                      <div className="text-xs text-[#9fadbc]">Profile photo</div>
+                      <Dialog open={avatarOpen} onOpenChange={setAvatarOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="trelloGray" size="sm" className="mt-2">
+                            Change avatar
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Update avatar</DialogTitle>
+                          </DialogHeader>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(["color", "gradient", "image", "upload"] as const).map((tab) => (
+                              <Button
+                                key={tab}
+                                type="button"
+                                variant="ghost"
+                                className={[
+                                  "text-sm capitalize",
+                                  avatarTab === tab ? "bg-[#a6c5e229] text-white" : "",
+                                ].join(" ")}
+                                onClick={() => setAvatarTab(tab)}
+                              >
+                                {tab === "image" ? "Unsplash" : tab === "upload" ? "Upload" : tab}
+                              </Button>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="ml-auto text-sm text-[#9fadbc] hover:text-white"
+                              disabled={clearAvatar.isPending}
+                              onClick={() => {
+                                clearAvatar.mutate()
+                                setAvatarOpen(false)
+                              }}
+                            >
+                              Reset
+                            </Button>
+                          </div>
+
+                          {avatarTab === "image" && (
+                            <Input
+                              value={avatarSearch}
+                              onChange={(e) => setAvatarSearch(e.target.value)}
+                              placeholder="Search Unsplash"
+                            />
+                          )}
+
+                          {avatarTab === "upload" ? (
+                            <div className="space-y-3">
+                              <div className="text-sm text-[#9fadbc]">
+                                Upload a square image (we’ll store it in GCS).
+                              </div>
+                              <Button
+                                variant="trello"
+                                disabled={avatarUploading}
+                                onClick={() => {
+                                  const input = document.createElement("input")
+                                  input.type = "file"
+                                  input.accept = "image/*"
+                                  input.value = ""
+                                  input.onchange = async (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0]
+                                    if (!file) return
+                                    await onUploadAvatarFile(file)
+                                  }
+                                  input.click()
+                                }}
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload photo
+                              </Button>
+                            </div>
+                          ) : avatarBackgroundsQuery.isLoading ? (
+                            <div className="text-sm text-[#9fadbc]">Loading backgrounds…</div>
+                          ) : avatarBackgroundItems.length === 0 ? (
+                            <div className="text-sm text-[#9fadbc]">No background found.</div>
+                          ) : (
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                              {avatarBackgroundItems.map((bg) => (
+                                <button
+                                  key={`${bg.type}:${bg.type === "image" ? bg.value.id : bg.value}`}
+                                  type="button"
+                                  className="h-16 rounded-md border border-[#9fadbc29] overflow-hidden focus:outline-none"
+                                  style={getBoardBackgroundStyle(bg, { preferThumb: true })}
+                                  onClick={() => {
+                                    setAvatarBackground.mutate({ background: bg })
+                                    setAvatarOpen(false)
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          )}
+
+                          {avatarTab !== "upload" && avatarBackgroundsQuery.hasNextPage && (
+                            <div className="flex justify-center">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="text-sm text-[#9fadbc] hover:text-white"
+                                onClick={() => avatarBackgroundsQuery.fetchNextPage()}
+                                disabled={avatarBackgroundsQuery.isFetchingNextPage}
+                              >
+                                {avatarBackgroundsQuery.isFetchingNextPage ? "Loading…" : "Load more"}
+                              </Button>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <div className="text-xs text-[#9fadbc]">Display name</div>
                     <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Display name" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-xs text-[#9fadbc]">Photo URL</div>
-                    <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="https://..." />
                   </div>
 
                   <div className="space-y-2">
@@ -446,7 +634,6 @@ export function Navbar() {
                         setDescription(me.description ?? "")
                       }
                       setDisplayName(firebaseUser?.displayName ?? "")
-                      setPhotoURL(firebaseUser?.photoURL ?? "")
                     }}
                   >
                     Reset
@@ -470,7 +657,6 @@ export function Navbar() {
                         try {
                           await updateProfile(u, {
                             displayName: displayName.trim() || null,
-                            photoURL: photoURL.trim() || null,
                           })
                         } catch {
                           // ignore firebase update errors for now

@@ -40,6 +40,12 @@ function buildObjectPath(boardId: string, ticketId: string, filename: string): s
   return `boards/${boardId}/tickets/${ticketId}/${rand}-${safe}`;
 }
 
+function buildUserAvatarPath(userId: string, filename: string): string {
+  const safe = sanitizeFilename(filename);
+  const rand = crypto.randomBytes(8).toString('hex');
+  return `users/${userId}/avatar/${rand}-${safe}`;
+}
+
 async function bootstrap() {
   const server = express();
 
@@ -135,6 +141,20 @@ async function bootstrap() {
           search: usersService.search.bind(usersService),
           updateMe: usersService.updateMe.bind(usersService),
           deleteMe: usersService.deleteMe.bind(usersService),
+          createAvatarUpload: async (userId: string, input: { filename: string; contentType: string; resumable?: boolean }) => {
+            const filename = sanitizeFilename(input.filename);
+            const contentType = input.contentType.trim() || 'application/octet-stream';
+            const objectPath = buildUserAvatarPath(userId, filename);
+            const upload = await gcsService.signedUploadUrl({
+              objectPath,
+              contentType,
+              resumable: input.resumable ?? false,
+            });
+            return { objectPath, upload };
+          },
+          getAvatarDownload: async (objectPath: string) => {
+            return await gcsService.signedDownloadUrl({ objectPath });
+          },
         };
 
         const workspaces = {

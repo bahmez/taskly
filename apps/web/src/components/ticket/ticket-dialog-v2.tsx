@@ -11,8 +11,6 @@ import {
   DialogContent,
   Input,
   Textarea,
-  Avatar,
-  AvatarFallback,
   Separator,
   useToast,
   cn,
@@ -37,6 +35,7 @@ import { ConfirmDialog } from '../ui/confirm-dialog';
 import { PromptDialog } from '../ui/prompt-dialog';
 import { MemberSelectDialog } from '../ui/member-select-dialog';
 import { LabelManagerDialog } from '../ui/label-manager-dialog';
+import { UserAvatar } from '@/components/user/user-avatar';
 import {
   MentionDropdown,
   filterMentionUsers,
@@ -127,6 +126,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const checklistsQuery = api.tickets.checklists.list.useQuery({ ticketId }, { enabled: open });
   const attachmentsQuery = api.tickets.attachments.list.useQuery({ ticketId }, { enabled: open });
   const assigneesQuery = api.tickets.assignees.list.useQuery({ ticketId }, { enabled: open });
+  const meQuery = api.users.me.useQuery(undefined, { enabled: open });
   const labelsQuery = api.tickets.labels.list.useQuery({ ticketId }, { enabled: open });
   const boardLabelsQuery = api.boards.labels.list.useQuery({ boardId }, { enabled: open });
   const remindersQuery = api.tickets.reminders.list.useQuery({ ticketId }, { enabled: open });
@@ -203,6 +203,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         username: u.username,
         first_name: u.first_name,
         last_name: u.last_name,
+        avatar: u.avatar ?? null,
       }));
   }, [workspaceMembersDetailsQuery.data]);
 
@@ -1092,11 +1093,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <div className="space-y-4">
                   {ticketFeedView === 'comments' && canComment && (
                     <div className="flex gap-3">
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="bg-[#44546f] text-white text-xs">
-                          {getUserInitials('You')}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar user={meQuery.data ?? { username: 'You' }} className="h-9 w-9 shrink-0" />
                       <div className="flex-1 space-y-3">
                         <Textarea
                           value={newComment}
@@ -1158,11 +1155,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                   {ticketFeedView === 'comments' &&
                     commentsQuery.data?.map((c) => (
                     <div key={c.id} className="flex gap-3">
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="bg-[#44546f] text-white text-xs">
-                          {initialsForUser(c.authorId)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar user={usersById.get(c.authorId)} className="h-9 w-9 shrink-0" />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="text-sm font-semibold">{formatUserPrimary(c.authorId)}</div>
@@ -1517,11 +1510,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <div className="flex flex-wrap gap-2">
                   {assigneesDetailsQuery.data?.map((u) => (
                     <div key={u.id} className="relative group">
-                      <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 ring-[#0c66e4] transition-all">
-                        <AvatarFallback className="bg-[#44546f] text-white text-xs">
-                          {initialsForUser(u.id)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar user={u} className="h-9 w-9 cursor-pointer hover:ring-2 ring-[#0c66e4] transition-all" />
                       {canAssign && (
                         <button
                           onClick={() => removeAssignee.mutate({ ticketId, userId: u.id })}

@@ -33,12 +33,11 @@ import {
   DialogTrigger,
   Input,
   Textarea,
-  Avatar,
-  AvatarFallback,
   cn,
   useToast,
 } from '@taskly/ui';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
+import { UserAvatar } from '@/components/user/user-avatar';
 import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar, ScrollText, Clock, Paintbrush } from 'lucide-react';
 import TicketDialogV2 from '@/components/ticket/ticket-dialog-v2';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -173,6 +172,7 @@ function SortableBoardTicket({
   formatUserPrimary,
   formatUserSecondary,
   initialsForUser,
+  userById,
 }: {
   t: TicketLike;
   labelMap: Map<string, AnyLabel>;
@@ -180,6 +180,7 @@ function SortableBoardTicket({
   formatUserPrimary: (userId: string) => string;
   formatUserSecondary: (userId: string) => string;
   initialsForUser: (userId: string) => string;
+  userById: Map<string, { id: string }>;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: dndTicketId(t.id),
@@ -287,13 +288,11 @@ function SortableBoardTicket({
           {t.assigneeIds && t.assigneeIds.length > 0 && (
             <div className="flex -space-x-1 ml-auto">
               {t.assigneeIds.slice(0, 3).map((aid) => (
-                <Avatar
+                <UserAvatar
                   key={aid}
+                  user={userById.get(aid)}
                   className="h-6 w-6 border-2 border-[#282e33]"
-                  title={[formatUserPrimary(aid), formatUserSecondary(aid)].filter(Boolean).join(' ')}
-                >
-                  <AvatarFallback className="bg-[#44546f] text-white text-xs">{initialsForUser(aid)}</AvatarFallback>
-                </Avatar>
+                />
               ))}
               {t.assigneeIds.length > 3 && (
                 <div className="h-6 w-6 rounded-full bg-[#44546f] border-2 border-[#282e33] flex items-center justify-center text-xs text-white">
@@ -338,6 +337,7 @@ function SortableBoardColumn({
   formatUserPrimary,
   formatUserSecondary,
   initialsForUser,
+  userById,
 }: {
   boardId: string;
   col: ColumnLike;
@@ -368,6 +368,7 @@ function SortableBoardColumn({
   formatUserPrimary: (userId: string) => string;
   formatUserSecondary: (userId: string) => string;
   initialsForUser: (userId: string) => string;
+  userById: Map<string, { id: string }>;
 }) {
   const { setNodeRef: setDropRef } = useDroppable({
     id: dndColumnDropId(col.id),
@@ -482,6 +483,7 @@ function SortableBoardColumn({
               formatUserPrimary={formatUserPrimary}
               formatUserSecondary={formatUserSecondary}
               initialsForUser={initialsForUser}
+              userById={userById}
             />
           ))}
         </SortableContext>
@@ -1184,6 +1186,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                     formatUserPrimary={formatUserPrimary}
                     formatUserSecondary={formatUserSecondary}
                     initialsForUser={initialsForUser}
+                    userById={usersById}
                   />
                 );
               })}

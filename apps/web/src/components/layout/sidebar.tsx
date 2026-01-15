@@ -54,7 +54,6 @@ export function Sidebar({ className, isCollapsed: controlledCollapsed, onCollaps
         isCollapsed ? "w-12" : "w-64",
         className,
       )}
-      style={{ zIndex: 1000 }}
       {...props}
     >
       {/* Collapse Toggle */}

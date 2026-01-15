@@ -66,6 +66,7 @@ function normalizeBoardBackground(input: BoardBackgroundInput): BoardBackground 
   };
 }
 
+
 async function resolveMentionUserIds(ctx: Context, workspaceId: string, text: string): Promise<string[]> {
   const legacyIds = extractMentionUserIdsFromLegacyMarkdown(text);
   const usernames = extractMentionUsernames(text);
@@ -128,19 +129,37 @@ export type User = {
   first_name: string;
   last_name: string;
   description: string;
+  avatar: UserAvatar | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type UserUpdateInput = Partial<
-  Pick<User, 'username' | 'first_name' | 'last_name' | 'description'>
+  Pick<User, 'username' | 'first_name' | 'last_name' | 'description' | 'avatar'>
 >;
+
+export type UserAvatarImage = {
+  source: 'upload';
+  objectPath: string;
+  url?: string | null;
+};
+
+export type UserAvatar =
+  | { type: 'initials'; background: BoardBackground | null }
+  | { type: 'image'; image: UserAvatarImage };
 
 export type UsersContext = {
   getById: (id: string) => Promise<User | null>;
   search: (q: string, limit: number) => Promise<User[]>;
   updateMe: (userId: string, patch: UserUpdateInput) => Promise<User>;
   deleteMe: (userId: string) => Promise<void>;
+  createAvatarUpload: (
+    userId: string,
+    input: { filename: string; contentType: string; resumable?: boolean },
+  ) => Promise<{ objectPath: string; upload: { url: string; method: string; headers: Record<string, string> } }>;
+  getAvatarDownload: (
+    objectPath: string,
+  ) => Promise<{ url: string; method: string; headers: Record<string, string> }>;
 };
 
 export type Workspace = {
@@ -573,6 +592,27 @@ async function safeNotify(p: Promise<unknown>): Promise<void> {
   }
 }
 
+async function withAvatarDownload(ctx: Context, user: User): Promise<User> {
+  if (user.avatar?.type !== 'image') return user;
+  const objectPath = user.avatar.image.objectPath;
+  if (!objectPath) return user;
+  try {
+    const download = await ctx.users.getAvatarDownload(objectPath);
+    return {
+      ...user,
+      avatar: {
+        type: 'image',
+        image: {
+          ...user.avatar.image,
+          url: download.url,
+        },
+      },
+    };
+  } catch {
+    return user;
+  }
+}
+
 async function safeLog(p: Promise<unknown>): Promise<void> {
   try {
     await p;
@@ -729,14 +769,16 @@ export const appRouter = router({
     }),
   }),
   users: router({
-    me: protectedProcedure.query(({ ctx }) => ctx.user),
+    me: protectedProcedure.query(async ({ ctx }) => {
+      return await withAvatarDownload(ctx, ctx.user!);
+    }),
 
     byId: protectedProcedure
       .input(z.object({ id: z.string().min(1) }))
       .query(async ({ ctx, input }) => {
         const user = await ctx.users.getById(input.id);
         if (!user) throw new TRPCError({ code: 'NOT_FOUND' });
-        return user;
+        return await withAvatarDownload(ctx, user);
       }),
 
     byIds: protectedProcedure
@@ -744,7 +786,8 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const ids = Array.from(new Set(input.ids));
         const users = await Promise.all(ids.map((id) => ctx.users.getById(id)));
-        return users.filter(Boolean) as User[];
+        const found = users.filter(Boolean) as User[];
+        return await Promise.all(found.map((u) => withAvatarDownload(ctx, u)));
       }),
 
     search: protectedProcedure
@@ -766,6 +809,62 @@ export const appRouter = router({
         }),
       )
       .mutation(({ ctx, input }) => ctx.users.updateMe(ctx.user!.id, input)),
+
+    avatar: router({
+      setInitialsBackground: protectedProcedure
+        .input(z.object({ background: boardBackgroundSchema.nullable() }))
+        .mutation(async ({ ctx, input }) => {
+          const avatar: UserAvatar = {
+            type: 'initials',
+            background: input.background ? normalizeBoardBackground(input.background) : null,
+          };
+          return await ctx.users.updateMe(ctx.user!.id, { avatar });
+        }),
+
+      clear: protectedProcedure.mutation(async ({ ctx }) => {
+        return await ctx.users.updateMe(ctx.user!.id, { avatar: null });
+      }),
+
+      createUpload: protectedProcedure
+        .input(
+          z.object({
+            filename: z.string().min(1).max(200),
+            contentType: z.string().min(1).max(200),
+            resumable: z.boolean().optional(),
+          }),
+        )
+        .mutation(async ({ ctx, input }) => {
+          return await ctx.users.createAvatarUpload(ctx.user!.id, {
+            filename: input.filename.trim(),
+            contentType: input.contentType.trim(),
+            resumable: input.resumable,
+          });
+        }),
+
+      completeUpload: protectedProcedure
+        .input(z.object({ objectPath: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          const avatar: UserAvatar = {
+            type: 'image',
+            image: { source: 'upload', objectPath: input.objectPath },
+          };
+          const updated = await ctx.users.updateMe(ctx.user!.id, { avatar });
+          const download = await ctx.users.getAvatarDownload(input.objectPath);
+          return {
+            user: {
+              ...updated,
+              avatar: {
+                type: 'image',
+                image: {
+                  ...avatar.image,
+                  url: download.url,
+                },
+              },
+            },
+            download,
+          };
+        }),
+    }),
 
     deleteMe: protectedProcedure.mutation(async ({ ctx }) => {
       await ctx.users.deleteMe(ctx.user!.id);

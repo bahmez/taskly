@@ -7,17 +7,18 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-  Avatar,
-  AvatarFallback,
   cn,
 } from '@taskly/ui';
 import { Search, Check } from 'lucide-react';
+import type { UserAvatar } from '@taskly/trpc';
+import { UserAvatar as UserAvatarView } from '@/components/user/user-avatar';
 
 interface Member {
   id: string;
   username: string;
   first_name?: string;
   last_name?: string;
+  avatar?: UserAvatar | null;
 }
 
 interface MemberSelectDialogProps {
@@ -26,18 +27,6 @@ interface MemberSelectDialogProps {
   members: Member[];
   selectedIds: string[];
   onSelect: (userId: string) => void;
-}
-
-function getUserInitials(member: Pick<Member, 'first_name' | 'last_name' | 'username'>): string {
-  const first = (member.first_name ?? '').trim();
-  const last = (member.last_name ?? '').trim();
-  const fromNames = `${first[0] ?? ''}${last[0] ?? ''}`.trim();
-  if (fromNames) return fromNames.toUpperCase();
-
-  const username = (member.username ?? '').trim();
-  if (username) return username.slice(0, 2).toUpperCase();
-
-  return '?';
 }
 
 export function MemberSelectDialog({
@@ -99,11 +88,7 @@ export function MemberSelectDialog({
                       : 'bg-[#282e33] border-[#9fadbc29] hover:border-[#0c66e4] hover:bg-[#2c3136]'
                   )}
                 >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-[#44546f] text-white text-sm">
-                      {getUserInitials(member)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatarView user={member} className="h-10 w-10" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">
                       {member.first_name || member.last_name
