@@ -74,6 +74,9 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       getAssigneeIds: vi.fn(async () => []),
       addAssignee: vi.fn(async () => {}),
       removeAssignee: vi.fn(async () => {}),
+      getWatchStatus: vi.fn(async () => ({ isWatching: false, isExplicit: false })),
+      setWatchStatus: vi.fn(async () => {}),
+      listWatchUserIds: vi.fn(async () => []),
       getLabelIds: vi.fn(async () => []),
       addLabel: vi.fn(async () => {}),
       removeLabel: vi.fn(async () => {}),
@@ -218,3 +221,25 @@ describe('ticket reminders (tRPC)', () => {
   });
 });
 
+describe('ticket watch (tRPC)', () => {
+  it('tickets.watch.get delegates to ctx.tickets.getWatchStatus', async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    await caller.tickets.watch.get({ ticketId: 't1' });
+    expect(ctx.tickets.getWatchStatus).toHaveBeenCalledWith('t1', 'u1');
+  });
+
+  it('tickets.watch.watch delegates to ctx.tickets.setWatchStatus(true)', async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    await caller.tickets.watch.watch({ ticketId: 't1' });
+    expect(ctx.tickets.setWatchStatus).toHaveBeenCalledWith('t1', 'u1', true);
+  });
+
+  it('tickets.watch.unwatch delegates to ctx.tickets.setWatchStatus(false)', async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    await caller.tickets.watch.unwatch({ ticketId: 't1' });
+    expect(ctx.tickets.setWatchStatus).toHaveBeenCalledWith('t1', 'u1', false);
+  });
+});

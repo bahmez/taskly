@@ -9,6 +9,7 @@ import type {
   TicketCommentModel,
   TicketModel,
   TicketUpdateInput,
+  TicketWatchOverrideModel,
 } from './ticket.model';
 
 type TicketDoc = Omit<TicketModel, 'id' | 'boardId'>;
@@ -16,6 +17,7 @@ type CommentDoc = Omit<TicketCommentModel, 'id' | 'ticketId'>;
 type ChecklistDoc = Omit<TicketChecklistModel, 'id' | 'ticketId' | 'items'>;
 type ChecklistItemDoc = Omit<TicketChecklistItemModel, 'id' | 'ticketId' | 'checklistId'>;
 type AttachmentDoc = Omit<TicketAttachmentModel, 'id' | 'ticketId'>;
+type WatcherDoc = Omit<TicketWatchOverrideModel, 'userId'>;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -80,6 +82,10 @@ export class TicketsStore {
 
   private attachmentsCol(boardId: string, ticketId: string) {
     return this.db.collection('boards').doc(boardId).collection('tickets').doc(ticketId).collection('attachments');
+  }
+
+  private watchersCol(boardId: string, ticketId: string) {
+    return this.db.collection('boards').doc(boardId).collection('tickets').doc(ticketId).collection('watchers');
   }
 
   private labelRef(boardId: string, labelId: string) {
@@ -205,6 +211,46 @@ export class TicketsStore {
     const current = found.doc.data() as Partial<TicketDoc>;
     if (current.isArchived) throw new Error('Ticket not found');
     await found.doc.ref.update({ assigneeIds: FieldValue.arrayRemove(userId), updatedAt: nowIso() });
+  }
+
+  async getWatchOverride(ticketId: string, userId: string): Promise<{ watch: boolean } | null> {
+    const found = await this.findTicketDoc(ticketId);
+    if (!found) throw new Error('Ticket not found');
+    const current = found.doc.data() as Partial<TicketDoc>;
+    if (current.isArchived) throw new Error('Ticket not found');
+
+    const ref = this.watchersCol(found.boardId, ticketId).doc(userId);
+    const snap = await ref.get();
+    if (!snap.exists) return null;
+    const data = snap.data() as Partial<WatcherDoc>;
+    return { watch: Boolean(data.watch ?? false) };
+  }
+
+  async listWatchOverrides(ticketId: string): Promise<Array<{ userId: string; watch: boolean }>> {
+    const found = await this.findTicketDoc(ticketId);
+    if (!found) throw new Error('Ticket not found');
+    const current = found.doc.data() as Partial<TicketDoc>;
+    if (current.isArchived) throw new Error('Ticket not found');
+
+    const snap = await this.watchersCol(found.boardId, ticketId).get();
+    return snap.docs.map((d) => {
+      const data = d.data() as Partial<WatcherDoc>;
+      return { userId: d.id, watch: Boolean(data.watch ?? false) };
+    });
+  }
+
+  async setWatchOverride(ticketId: string, userId: string, watch: boolean): Promise<void> {
+    const found = await this.findTicketDoc(ticketId);
+    if (!found) throw new Error('Ticket not found');
+    const current = found.doc.data() as Partial<TicketDoc>;
+    if (current.isArchived) throw new Error('Ticket not found');
+
+    const now = nowIso();
+    const ref = this.watchersCol(found.boardId, ticketId).doc(userId);
+    const snap = await ref.get();
+    const createdAt = snap.exists ? (snap.data() as Partial<WatcherDoc>).createdAt ?? now : now;
+    const doc: WatcherDoc = { watch, createdAt, updatedAt: now };
+    await ref.set(doc);
   }
 
   // Labels (assigned on ticket, labels live under board)

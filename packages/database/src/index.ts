@@ -38,6 +38,7 @@ export type {
   TicketChecklistItemModel,
   TicketAttachmentModel,
   TicketAttachmentStatus,
+  TicketWatchOverrideModel,
 } from './tickets/ticket.model';
 export { TicketsStore } from './tickets/tickets.store';
 export { TicketsService } from './tickets/tickets.service';
