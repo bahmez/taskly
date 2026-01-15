@@ -19,6 +19,7 @@ import {
 } from '@taskly/database';
 import type { AppRouter, Context } from '@taskly/trpc';
 import { GcsService } from './gcs/gcs.service.js';
+import { BoardBackgroundsService } from './board/board-backgrounds.service.js';
 import crypto from 'node:crypto';
 
 function extractBearerToken(header: string | undefined): string | null {
@@ -77,6 +78,7 @@ async function bootstrap() {
   const usersService = app.get(UsersService);
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
+  const boardBackgroundsService = app.get(BoardBackgroundsService);
   const ticketsService = app.get(TicketsService);
   const ticketRemindersService = app.get(TicketRemindersService);
   const notificationsService = app.get(NotificationsService);
@@ -187,6 +189,10 @@ async function bootstrap() {
           archiveTicket: boardsService.archiveTicket.bind(boardsService),
         };
 
+        const boardBackgrounds = {
+          list: boardBackgroundsService.list.bind(boardBackgroundsService),
+        };
+
         const makeTickets = (actorId: string | null) => ({
           getById: ticketsService.getById.bind(ticketsService),
           update: ticketsService.update.bind(ticketsService),
@@ -284,20 +290,50 @@ async function bootstrap() {
         };
 
         if (!token) {
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), ticketReminders, notifications, activityLogs };
+          return {
+            user: null,
+            users,
+            workspaces,
+            boards,
+            boardBackgrounds,
+            tickets: makeTickets(null),
+            ticketReminders,
+            notifications,
+            activityLogs,
+          };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards, tickets: makeTickets(user.id), ticketReminders, notifications, activityLogs };
+          return {
+            user,
+            users,
+            workspaces,
+            boards,
+            boardBackgrounds,
+            tickets: makeTickets(user.id),
+            ticketReminders,
+            notifications,
+            activityLogs,
+          };
         } catch (e) {
           if (process.env.NODE_ENV !== 'production') {
             const err = e as { message?: string; code?: string };
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), ticketReminders, notifications, activityLogs };
+          return {
+            user: null,
+            users,
+            workspaces,
+            boards,
+            boardBackgrounds,
+            tickets: makeTickets(null),
+            ticketReminders,
+            notifications,
+            activityLogs,
+          };
         }
       },
     }),

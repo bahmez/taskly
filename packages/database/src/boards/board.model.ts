@@ -1,9 +1,25 @@
+export type BoardBackgroundImage = {
+  source: 'unsplash';
+  id: string;
+  url: string;
+  thumbUrl: string;
+  blurHash?: string | null;
+  color?: string | null;
+  authorName?: string | null;
+  authorUrl?: string | null;
+};
+
+export type BoardBackground =
+  | { type: 'color'; value: string }
+  | { type: 'gradient'; value: string }
+  | { type: 'image'; value: BoardBackgroundImage };
+
 export type BoardModel = {
   id: string;
   workspaceId: string;
   title: string;
   description: string;
-  background: string | null;
+  background: BoardBackground | null;
   order: number;
   isArchived: boolean;
   archivedAt: string | null;
@@ -15,7 +31,7 @@ export type BoardCreateInput = {
   workspaceId: string;
   title: string;
   description?: string;
-  background?: string | null;
+  background?: BoardBackground | null;
 };
 
 export type BoardUpdateInput = Partial<Pick<BoardModel, 'title' | 'description' | 'background'>>;

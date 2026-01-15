@@ -36,6 +36,36 @@ function extractMentionUsernames(text: string): string[] {
   return Array.from(new Set(names));
 }
 
+const boardBackgroundImageSchema = z.object({
+  source: z.literal('unsplash').optional(),
+  id: z.string().min(1),
+  url: z.string().url(),
+  thumbUrl: z.string().url(),
+  blurHash: z.string().optional().nullable(),
+  color: z.string().optional().nullable(),
+  authorName: z.string().optional().nullable(),
+  authorUrl: z.string().url().optional().nullable(),
+});
+
+const boardBackgroundSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('color'), value: z.string().min(1) }),
+  z.object({ type: z.literal('gradient'), value: z.string().min(1) }),
+  z.object({ type: z.literal('image'), value: boardBackgroundImageSchema }),
+]);
+
+type BoardBackgroundInput = z.infer<typeof boardBackgroundSchema>;
+
+function normalizeBoardBackground(input: BoardBackgroundInput): BoardBackground {
+  if (input.type !== 'image') return input;
+  return {
+    type: 'image',
+    value: {
+      ...input.value,
+      source: 'unsplash',
+    },
+  };
+}
+
 async function resolveMentionUserIds(ctx: Context, workspaceId: string, text: string): Promise<string[]> {
   const legacyIds = extractMentionUserIdsFromLegacyMarkdown(text);
   const usernames = extractMentionUsernames(text);
@@ -135,13 +165,29 @@ export type Board = {
   workspaceId: string;
   title: string;
   description: string;
-  background: string | null;
+  background: BoardBackground | null;
   order: number;
   isArchived: boolean;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+export type BoardBackgroundImage = {
+  source: 'unsplash';
+  id: string;
+  url: string;
+  thumbUrl: string;
+  blurHash?: string | null;
+  color?: string | null;
+  authorName?: string | null;
+  authorUrl?: string | null;
+};
+
+export type BoardBackground =
+  | { type: 'color'; value: string }
+  | { type: 'gradient'; value: string }
+  | { type: 'image'; value: BoardBackgroundImage };
 
 export type BoardColumn = {
   id: string;
@@ -363,11 +409,11 @@ export type WorkspacesContext = {
 
 export type BoardsContext = {
   getBoardById: (boardId: string) => Promise<Board | null>;
-  updateBoard: (boardId: string, patch: { title?: string; description?: string; background?: string | null }) => Promise<Board>;
+  updateBoard: (boardId: string, patch: { title?: string; description?: string; background?: BoardBackground | null }) => Promise<Board>;
   archiveBoard: (boardId: string) => Promise<void>;
 
   listBoardsForWorkspace: (workspaceId: string) => Promise<Board[]>;
-  createBoard: (input: { workspaceId: string; title: string; description?: string; background?: string | null }) => Promise<Board>;
+  createBoard: (input: { workspaceId: string; title: string; description?: string; background?: BoardBackground | null }) => Promise<Board>;
   reorderBoards: (workspaceId: string, boardIds: string[]) => Promise<void>;
 
   listColumns: (boardId: string) => Promise<BoardColumn[]>;
@@ -390,6 +436,15 @@ export type BoardsContext = {
   ) => Promise<Ticket>;
   moveTicket: (boardId: string, ticketId: string, input: { columnId: string; position: number }) => Promise<void>;
   archiveTicket: (boardId: string, ticketId: string) => Promise<void>;
+};
+
+export type BoardBackgroundsContext = {
+  list: (input: {
+    type: 'color' | 'gradient' | 'image';
+    limit: number;
+    cursor?: string | null;
+    query?: string | null;
+  }) => Promise<{ items: BoardBackground[]; nextCursor: string | null }>;
 };
 
 export type TicketsContext = {
@@ -490,6 +545,7 @@ export type Context = {
   users: UsersContext;
   workspaces: WorkspacesContext;
   boards: BoardsContext;
+  boardBackgrounds: BoardBackgroundsContext;
   tickets: TicketsContext;
   ticketReminders: TicketRemindersContext;
   notifications: NotificationsContext;
@@ -918,14 +974,21 @@ export const appRouter = router({
             workspaceId: z.string().min(1),
             title: z.string().min(1).max(200),
             backgroundColor: z.string().nullable().optional(),
+            background: boardBackgroundSchema.nullable().optional(),
           }),
         )
         .mutation(async ({ ctx, input }) => {
           await requireWorkspacePermission(ctx, input.workspaceId, 'workspace.boards.write');
+          const legacyColor = (input.backgroundColor ?? '').trim();
+          const background: BoardBackground | null = input.background
+            ? normalizeBoardBackground(input.background)
+            : legacyColor
+              ? ({ type: 'color', value: legacyColor } satisfies BoardBackground)
+              : null;
           return await ctx.boards.createBoard({
             workspaceId: input.workspaceId,
             title: input.title.trim(),
-            background: input.backgroundColor ?? null,
+            background,
           });
         }),
 
@@ -1654,6 +1717,24 @@ export const appRouter = router({
     }),
   }),
   boards: router({
+      listBackgrounds: protectedProcedure
+        .input(
+          z.object({
+            type: z.enum(['color', 'gradient', 'image']),
+            limit: z.number().int().min(1).max(50).default(20),
+            cursor: z.string().min(1).nullable().optional(),
+            query: z.string().min(1).nullable().optional(),
+          }),
+        )
+        .query(({ ctx, input }) =>
+          ctx.boardBackgrounds.list({
+            type: input.type,
+            limit: input.limit,
+            cursor: input.cursor ?? null,
+            query: input.query ?? null,
+          }),
+        ),
+
     view: protectedProcedure
       .input(z.object({ boardId: z.string().min(1) }))
       .query(async ({ ctx, input }) => {
@@ -1679,6 +1760,8 @@ export const appRouter = router({
           permissions: {
             canMetaWrite: hasPermission(grants, 'board.meta.write'),
             canLabelsWrite: hasPermission(grants, 'board.meta.write'),
+            canBackgroundWrite:
+              hasPermission(grants, 'board.meta.write') || hasPermission(grants, 'board.tickets.write'),
           },
         };
       }),
@@ -1689,15 +1772,34 @@ export const appRouter = router({
           boardId: z.string().min(1),
           title: z.string().min(1).max(200).optional(),
           description: z.string().max(2000).optional(),
-          background: z.string().nullable().optional(),
+          background: z.union([boardBackgroundSchema, z.string().min(1)]).nullable().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        const { board } = await requireBoardPermission(ctx, input.boardId, 'board.meta.write');
-        const patch: { title?: string; description?: string; background?: string | null } = {};
+        const { board, grants } = await requireBoardPermission(ctx, input.boardId, 'board.meta.read');
+        const wantsTitle = typeof input.title === 'string';
+        const wantsDescription = typeof input.description === 'string';
+        const wantsBackground = input.background !== undefined;
+        if (wantsTitle || wantsDescription) {
+          if (!hasPermission(grants, 'board.meta.write')) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Missing permission' });
+          }
+        } else if (wantsBackground) {
+          if (!hasPermission(grants, 'board.meta.write') && !hasPermission(grants, 'board.tickets.write')) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Missing permission' });
+          }
+        }
+        const patch: { title?: string; description?: string; background?: BoardBackground | null } = {};
         if (typeof input.title === 'string') patch.title = input.title.trim();
         if (typeof input.description === 'string') patch.description = input.description.trim();
-        if (input.background === null || typeof input.background === 'string') patch.background = input.background;
+        if (input.background === null) {
+          patch.background = null;
+        } else if (typeof input.background === 'string') {
+          const value = input.background.trim();
+          if (value) patch.background = { type: 'color', value };
+        } else if (input.background) {
+          patch.background = normalizeBoardBackground(input.background);
+        }
         const updated = await ctx.boards.updateBoard(input.boardId, patch);
         await safeLog(
           ctx.activityLogs.create(board.id, {

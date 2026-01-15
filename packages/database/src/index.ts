@@ -16,6 +16,8 @@ export { WorkspacesStore } from './workspaces/workspaces.store';
 export { WorkspacesService } from './workspaces/workspaces.service';
 
 export type {
+  BoardBackground,
+  BoardBackgroundImage,
   BoardModel,
   BoardCreateInput,
   BoardUpdateInput,

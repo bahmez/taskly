@@ -63,6 +63,9 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       moveTicket: vi.fn(async () => {}),
       archiveTicket: vi.fn(async () => {}),
     },
+    boardBackgrounds: {
+      list: vi.fn(async () => ({ items: [], nextCursor: null })),
+    },
     tickets: {
       getById: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
       update: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T2', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
