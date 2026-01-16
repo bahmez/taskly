@@ -1,3 +1,21 @@
+/**
+ * Application Sidebar Component
+ *
+ * Left navigation panel displaying:
+ * - Workspace switcher
+ * - Boards within the selected workspace
+ * - Quick navigation links (Members, Settings)
+ * - Create new board button
+ *
+ * Features:
+ * - Collapsible/expandable state for responsive layout
+ * - Board creation dialog
+ * - Workspace quick navigation
+ * - Active state highlighting
+ *
+ * Accepts controlled or uncontrolled collapse state.
+ */
+
 "use client"
 
 import * as React from "react"
@@ -8,8 +26,14 @@ import { usePathname, useRouter } from "next/navigation"
 import { api } from "@/app/trpc"
 import { useWorkspaceUI } from "@/components/workspace/workspace-ui-provider"
 
+/**
+ * Props for Sidebar component.
+ * Supports both controlled and uncontrolled collapse state.
+ */
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Controlled collapse state (overrides internal state if provided) */
   isCollapsed?: boolean
+  /** Callback when collapse state changes */
   onCollapse?: (collapsed: boolean) => void
 }
 
@@ -48,13 +72,16 @@ export function Sidebar({ className, isCollapsed: controlledCollapsed, onCollaps
   const [newBoardTitle, setNewBoardTitle] = React.useState("")
 
   return (
-    <div className={cn(
-      "relative flex flex-col border-r border-[#9fadbc29] bg-[#1d2125] bg-opacity-90 backdrop-blur-xl text-[#9fadbc] transition-all duration-300", 
-      isCollapsed ? "w-12" : "w-64",
-      className
-    )} {...props}>
+    <div
+      className={cn(
+        "relative z-100 flex flex-col border-r border-[#9fadbc29] bg-[#1d2125] bg-opacity-90 backdrop-blur-xl text-[#9fadbc] transition-all duration-300",
+        isCollapsed ? "w-12" : "w-64",
+        className,
+      )}
+      {...props}
+    >
       {/* Collapse Toggle */}
-      <div className="absolute -right-3 top-3 z-10">
+      <div className="absolute -right-3 top-3 z-100">
          <Button 
           variant="outline" 
           size="icon" 

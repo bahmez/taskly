@@ -1,3 +1,18 @@
+/**
+ * Login Page Client Component
+ *
+ * Handles user sign in with email and password via Firebase Auth.
+ * Auto-redirects authenticated users to dashboard or return URL.
+ * Shows error toast on login failure.
+ *
+ * Features:
+ * - Email/password form
+ * - Form validation
+ * - Error handling with toasts
+ * - Redirect after successful login
+ * - Link to registration page
+ */
+
 'use client';
 
 import Link from 'next/link';
@@ -6,6 +21,13 @@ import { useRouter } from 'next/navigation';
 import { Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, Input, useToast } from '@taskly/ui';
 import { useAuth } from '@/auth/auth-provider';
 
+/**
+ * Safely decodes URI component, returning original value on error.
+ * Used to safely handle next URL parameter.
+ * 
+ * @param value - Encoded URL string
+ * @returns Decoded value or original if decode fails
+ */
 function safeDecodeURIComponent(value: string) {
   try {
     return decodeURIComponent(value);
@@ -14,28 +36,44 @@ function safeDecodeURIComponent(value: string) {
   }
 }
 
+/**
+ * Login form component.
+ * Displays email/password form and handles authentication.
+ *
+ * @param props - Component props
+ * @param props.nextPath - URL-encoded path to redirect after login (default: /dashboard)
+ */
 export function LoginClient({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, signInWithEmailPassword } = useAuth();
 
+  // Safely decode the next path or default to dashboard
   const redirectTo = safeDecodeURIComponent(nextPath ?? '/dashboard');
 
+  // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Auto-redirect if already authenticated
   useEffect(() => {
     if (!loading && user) router.replace(redirectTo);
   }, [loading, user, router, redirectTo]);
 
+  /**
+   * Handles form submission - authenticates user and redirects.
+   */
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     try {
+      // Attempt Firebase sign in
       await signInWithEmailPassword(email.trim(), password);
+      // Redirect to dashboard or intended page
       router.replace(redirectTo);
     } catch (err) {
+      // Show error toast on authentication failure
       toast({
         title: 'Connexion impossible',
         description: err instanceof Error ? err.message : 'Une erreur est survenue.',

@@ -2,6 +2,39 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { UsersStore } from './users.store';
 
+describe('UsersStore', () => {
+  it('getById normalizes avatar background', async () => {
+    const snap = {
+      exists: true,
+      id: 'u1',
+      data: () => ({
+        username: 'alice',
+        first_name: 'Alice',
+        last_name: 'Doe',
+        description: '',
+        avatar: {
+          type: 'initials',
+          background: { type: 'color', value: '#0EA5E9' },
+        },
+        createdAt: 'now',
+        updatedAt: 'now',
+      }),
+    };
+
+    const ref = { get: async () => snap };
+    const col = { doc: (_id: string) => ref };
+    const db = { collection: (_name: string) => col };
+
+    const store = new UsersStore(db as unknown as Firestore);
+    const user = await store.getById('u1');
+
+    expect(user?.avatar).toEqual({
+      type: 'initials',
+      background: { type: 'color', value: '#0EA5E9' },
+    });
+  });
+});
+
 type UserDoc = { username: string; first_name: string; last_name: string; description: string; createdAt: string; updatedAt: string };
 type Doc = { id: string; data: () => UserDoc };
 type Snap = { docs: Doc[] };

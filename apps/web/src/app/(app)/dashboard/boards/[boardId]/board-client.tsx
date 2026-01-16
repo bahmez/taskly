@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { api } from '@/app/trpc';
+import type { BoardBackground } from '@taskly/trpc';
+import { getBoardBackgroundStyle } from '@/components/board/board-background';
 import {
   DndContext,
   DragEndEvent,
@@ -31,13 +33,12 @@ import {
   DialogTrigger,
   Input,
   Textarea,
-  Avatar,
-  AvatarFallback,
   cn,
   useToast,
 } from '@taskly/ui';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
-import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar, ScrollText, Clock } from 'lucide-react';
+import { UserAvatar } from '@/components/user/user-avatar';
+import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar, ScrollText, Clock, Paintbrush } from 'lucide-react';
 import TicketDialogV2 from '@/components/ticket/ticket-dialog-v2';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -140,6 +141,17 @@ function formatBoardActivityType(input: { type: string; ticketTitle?: string | n
   }
 }
 
+function boardBackgroundKey(bg: BoardBackground): string {
+  if (bg.type === 'image') return `image:${bg.value.id}`;
+  return `${bg.type}:${bg.value}`;
+}
+
+function isSameBackground(a: BoardBackground, b: BoardBackground | null): boolean {
+  if (!b || a.type !== b.type) return false;
+  if (a.type === 'image' && b.type === 'image') return a.value.id === b.value.id;
+  return a.value === b.value;
+}
+
 type AnyLabel = { id: string; name: string; color: string };
 type TicketLike = {
   id: string;
@@ -157,9 +169,10 @@ function SortableBoardTicket({
   t,
   labelMap,
   onOpen,
-  formatUserPrimary,
-  formatUserSecondary,
-  initialsForUser,
+  formatUserPrimary: _formatUserPrimary,
+  formatUserSecondary: _formatUserSecondary,
+  initialsForUser: _initialsForUser,
+  userById,
 }: {
   t: TicketLike;
   labelMap: Map<string, AnyLabel>;
@@ -167,6 +180,7 @@ function SortableBoardTicket({
   formatUserPrimary: (userId: string) => string;
   formatUserSecondary: (userId: string) => string;
   initialsForUser: (userId: string) => string;
+  userById: Map<string, { id: string }>;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: dndTicketId(t.id),
@@ -274,13 +288,11 @@ function SortableBoardTicket({
           {t.assigneeIds && t.assigneeIds.length > 0 && (
             <div className="flex -space-x-1 ml-auto">
               {t.assigneeIds.slice(0, 3).map((aid) => (
-                <Avatar
+                <UserAvatar
                   key={aid}
+                  user={userById.get(aid)}
                   className="h-6 w-6 border-2 border-[#282e33]"
-                  title={[formatUserPrimary(aid), formatUserSecondary(aid)].filter(Boolean).join(' ')}
-                >
-                  <AvatarFallback className="bg-[#44546f] text-white text-xs">{initialsForUser(aid)}</AvatarFallback>
-                </Avatar>
+                />
               ))}
               {t.assigneeIds.length > 3 && (
                 <div className="h-6 w-6 rounded-full bg-[#44546f] border-2 border-[#282e33] flex items-center justify-center text-xs text-white">
@@ -296,7 +308,7 @@ function SortableBoardTicket({
 }
 
 function SortableBoardColumn({
-  boardId,
+  boardId: _boardId,
   col,
   colTickets,
   isEditingThisColumn,
@@ -325,6 +337,7 @@ function SortableBoardColumn({
   formatUserPrimary,
   formatUserSecondary,
   initialsForUser,
+  userById,
 }: {
   boardId: string;
   col: ColumnLike;
@@ -355,6 +368,7 @@ function SortableBoardColumn({
   formatUserPrimary: (userId: string) => string;
   formatUserSecondary: (userId: string) => string;
   initialsForUser: (userId: string) => string;
+  userById: Map<string, { id: string }>;
 }) {
   const { setNodeRef: setDropRef } = useDroppable({
     id: dndColumnDropId(col.id),
@@ -469,6 +483,7 @@ function SortableBoardColumn({
               formatUserPrimary={formatUserPrimary}
               formatUserSecondary={formatUserSecondary}
               initialsForUser={initialsForUser}
+              userById={userById}
             />
           ))}
         </SortableContext>
@@ -514,6 +529,23 @@ export default function BoardClient({ boardId }: { boardId: string }) {
   const boardActivityQuery = api.boards.activity.list.useQuery(
     { boardId, limit: 30, cursor: null, includeTickets: true },
     { enabled: boardActivityOpen },
+  );
+
+  const [backgroundPickerOpen, setBackgroundPickerOpen] = React.useState(false);
+  const [backgroundTab, setBackgroundTab] = React.useState<'color' | 'gradient' | 'image'>('color');
+  const [imageSearch, setImageSearch] = React.useState('');
+  const imageSearchValue = imageSearch.trim();
+
+  const backgroundsQuery = api.boards.listBackgrounds.useInfiniteQuery(
+    {
+      type: backgroundTab,
+      limit: 12,
+      query: backgroundTab === 'image' && imageSearchValue ? imageSearchValue : undefined,
+    },
+    {
+      enabled: backgroundPickerOpen,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    },
   );
 
   React.useEffect(() => {
@@ -593,9 +625,10 @@ export default function BoardClient({ boardId }: { boardId: string }) {
   });
 
   const board = viewQuery.data?.board;
+  const canEditBackground = viewQuery.data?.permissions?.canBackgroundWrite ?? false;
   const serverColumns = React.useMemo(() => viewQuery.data?.columns ?? [], [viewQuery.data?.columns]);
   const serverTickets = React.useMemo(() => viewQuery.data?.tickets ?? [], [viewQuery.data?.tickets]);
-  const boardLabels = labelsQuery.data ?? [];
+  const boardLabels = React.useMemo(() => labelsQuery.data ?? [], [labelsQuery.data]);
 
   const [columnsState, setColumnsState] = React.useState(serverColumns);
   const [ticketsState, setTicketsState] = React.useState(serverTickets);
@@ -619,7 +652,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     return new Map((assigneeUsersQuery.data ?? []).map((u) => [u.id, u]));
   }, [assigneeUsersQuery.data]);
 
-  const boardActivityItems = boardActivityQuery.data?.items ?? [];
+  const boardActivityItems = React.useMemo(() => boardActivityQuery.data?.items ?? [], [boardActivityQuery.data?.items]);
   const activityActorIds = React.useMemo(() => {
     const ids = boardActivityItems.map((i) => i.actorId).filter(Boolean) as string[];
     return Array.from(new Set(ids));
@@ -853,9 +886,12 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     return <div className="p-6 text-[#b6c2cf]">Board not found.</div>;
   }
 
+  const currentBackground = board.background ?? null;
+  const backgroundItems = backgroundsQuery.data?.pages.flatMap((p) => p.items) ?? [];
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-6 pt-5 pb-3 text-[#b6c2cf] flex items-center justify-between border-b border-[#9fadbc29]">
+    <div className="h-full flex flex-col" style={getBoardBackgroundStyle(board.background, { fallback: '#0b0f13' })}>
+      <div className="px-6 pt-5 pb-3 text-[#b6c2cf] flex items-center justify-between border-b border-[#9fadbc29] bg-[#0b0f13]/70 backdrop-blur-sm">
         <div>
           <div className="text-xl font-semibold">
             {isEditingBoardTitle ? (
@@ -900,6 +936,99 @@ export default function BoardClient({ boardId }: { boardId: string }) {
         </div>
 
         <div className="flex gap-2">
+          <Dialog open={backgroundPickerOpen} onOpenChange={setBackgroundPickerOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className="gap-2" disabled={!canEditBackground}>
+                <Paintbrush className="h-4 w-4" />
+                Background
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Board background</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                {(['color', 'gradient', 'image'] as const).map((tab) => (
+                  <Button
+                    key={tab}
+                    type="button"
+                    variant="ghost"
+                    className={cn(
+                      'text-sm capitalize',
+                      backgroundTab === tab && 'bg-[#a6c5e229] text-white',
+                    )}
+                    onClick={() => setBackgroundTab(tab)}
+                  >
+                    {tab === 'image' ? 'Images' : tab === 'gradient' ? 'Gradients' : 'Colors'}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="ml-auto text-sm text-[#9fadbc] hover:text-white"
+                  onClick={() => {
+                    updateBoard.mutate({ boardId, background: null });
+                    setBackgroundPickerOpen(false);
+                  }}
+                  disabled={updateBoard.isPending}
+                >
+                  Remove
+                </Button>
+              </div>
+
+              {backgroundTab === 'image' && (
+                <Input
+                  value={imageSearch}
+                  onChange={(e) => setImageSearch(e.target.value)}
+                  placeholder="Search Unsplash"
+                />
+              )}
+
+              {backgroundsQuery.isLoading ? (
+                <div className="text-sm text-[#9fadbc]">Loading backgrounds…</div>
+              ) : backgroundItems.length === 0 ? (
+                <div className="text-sm text-[#9fadbc]">No background found.</div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {backgroundItems.map((bg) => {
+                    const selected = isSameBackground(bg, currentBackground);
+                    return (
+                      <button
+                        key={boardBackgroundKey(bg)}
+                        type="button"
+                        className={cn(
+                          'h-16 rounded-md border border-[#9fadbc29] overflow-hidden focus:outline-none',
+                          selected && 'ring-2 ring-white ring-offset-2 ring-offset-[#1d2125]',
+                        )}
+                        style={getBoardBackgroundStyle(bg, { preferThumb: true })}
+                        onClick={() => {
+                          updateBoard.mutate({ boardId, background: bg });
+                          setBackgroundPickerOpen(false);
+                        }}
+                        disabled={updateBoard.isPending}
+                        title={bg.type === 'image' ? bg.value.authorName ?? 'Unsplash' : bg.value}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {backgroundsQuery.hasNextPage && (
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-sm text-[#9fadbc] hover:text-white"
+                    onClick={() => backgroundsQuery.fetchNextPage()}
+                    disabled={backgroundsQuery.isFetchingNextPage}
+                  >
+                    {backgroundsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={boardActivityOpen} onOpenChange={setBoardActivityOpen}>
             <Button variant="ghost" className="gap-2" onClick={() => setBoardActivityOpen(true)}>
               <ScrollText className="h-4 w-4" />
@@ -1057,6 +1186,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                     formatUserPrimary={formatUserPrimary}
                     formatUserSecondary={formatUserSecondary}
                     initialsForUser={initialsForUser}
+                    userById={usersById}
                   />
                 );
               })}

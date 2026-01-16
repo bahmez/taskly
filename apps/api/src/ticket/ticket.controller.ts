@@ -10,6 +10,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, FirebaseAuthGuard } from '@taskly/auth';
 import type { TicketUpdateInput, UserModel } from '@taskly/database';
 import { TicketsService, UsersService } from '@taskly/database';
@@ -17,26 +18,309 @@ import { TicketAccessService } from './ticket-access.service.js';
 import { GcsService } from '../gcs/gcs.service.js';
 import crypto from 'node:crypto';
 
-type PatchTicketDto = {
-  title?: string;
-  description?: string;
-  dueDate?: string | null;
-};
+class SignedUrlDto {
+  @ApiProperty({ example: 'https://storage.googleapis.com/...' })
+  url!: string;
 
-type CreateCommentDto = { content?: string };
-type PatchCommentDto = { content?: string };
-type AddAssigneeDto = { userId?: string };
-type CreateChecklistDto = { title?: string };
-type PatchChecklistDto = { title?: string };
-type ReorderChecklistsDto = { checklistIds?: string[] };
-type CreateChecklistItemDto = { content?: string };
-type PatchChecklistItemDto = { content?: string; isDone?: boolean };
-type ReorderChecklistItemsDto = { itemIds?: string[] };
-type AddLabelDto = { labelId?: string };
-type CreateAttachmentUploadUrlDto = { filename?: string; contentType?: string; resumable?: boolean };
-type CompleteAttachmentDto = { size?: number };
+  @ApiProperty({ enum: ['PUT', 'GET', 'POST'] })
+  method!: 'PUT' | 'GET' | 'POST';
+
+  @ApiProperty({ type: 'object', example: { 'Content-Type': 'application/pdf' } })
+  headers!: Record<string, string>;
+
+  @ApiProperty({ example: '2024-01-01T10:15:00.000Z' })
+  expiresAt!: string;
+
+  @ApiProperty({ enum: ['write', 'resumable', 'read'] })
+  type!: 'write' | 'resumable' | 'read';
+}
+
+class TicketDto {
+  @ApiProperty({ example: 'ticket_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'board_123' })
+  boardId!: string;
+
+  @ApiProperty({ example: 'col_123' })
+  columnId!: string;
+
+  @ApiProperty({ example: 'Fix login' })
+  title!: string;
+
+  @ApiProperty({ example: 'Details' })
+  description!: string;
+
+  @ApiProperty({ example: '2024-01-10T10:00:00.000Z', nullable: true })
+  dueDate!: string | null;
+
+  @ApiProperty({ type: [String], required: false, example: ['usr_1', 'usr_2'] })
+  assigneeIds?: string[];
+
+  @ApiProperty({ type: [String], example: ['label_1'] })
+  labelIds!: string[];
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: false })
+  isArchived!: boolean;
+
+  @ApiProperty({ example: null, nullable: true })
+  archivedAt!: string | null;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class TicketDetailsDto {
+  @ApiProperty({ example: 'ticket_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'board_123' })
+  boardId!: string;
+
+  @ApiProperty({ example: 'col_123' })
+  columnId!: string;
+
+  @ApiProperty({ example: 'Fix login' })
+  title!: string;
+
+  @ApiProperty({ example: 'Details' })
+  description!: string;
+
+  @ApiProperty({ example: '2024-01-10T10:00:00.000Z', nullable: true })
+  dueDate!: string | null;
+
+  @ApiProperty({ type: [String], required: false, example: ['usr_1', 'usr_2'] })
+  assigneeIds?: string[];
+
+  @ApiProperty({ type: [String], example: ['label_1'] })
+  labelIds!: string[];
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class TicketCommentDto {
+  @ApiProperty({ example: 'cmt_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ticket_123' })
+  ticketId!: string;
+
+  @ApiProperty({ example: 'usr_123' })
+  authorId!: string;
+
+  @ApiProperty({ example: 'Looks good' })
+  content!: string;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class AssigneeIdsDto {
+  @ApiProperty({ type: [String], example: ['usr_1', 'usr_2'] })
+  assigneeIds!: string[];
+}
+
+class LabelIdsDto {
+  @ApiProperty({ type: [String], example: ['label_1', 'label_2'] })
+  labelIds!: string[];
+}
+
+class TicketChecklistItemDto {
+  @ApiProperty({ example: 'item_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ticket_123' })
+  ticketId!: string;
+
+  @ApiProperty({ example: 'chk_123' })
+  checklistId!: string;
+
+  @ApiProperty({ example: 'Do the thing' })
+  content!: string;
+
+  @ApiProperty({ example: false })
+  isDone!: boolean;
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class TicketChecklistDto {
+  @ApiProperty({ example: 'chk_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ticket_123' })
+  ticketId!: string;
+
+  @ApiProperty({ example: 'Release' })
+  title!: string;
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+
+  @ApiProperty({ type: [TicketChecklistItemDto] })
+  items!: TicketChecklistItemDto[];
+}
+
+class TicketAttachmentDto {
+  @ApiProperty({ example: 'att_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ticket_123' })
+  ticketId!: string;
+
+  @ApiProperty({ example: 'usr_123' })
+  createdBy!: string;
+
+  @ApiProperty({ example: 'spec.pdf' })
+  filename!: string;
+
+  @ApiProperty({ example: 'application/pdf' })
+  contentType!: string;
+
+  @ApiProperty({ example: 'boards/...' })
+  objectPath!: string;
+
+  @ApiProperty({ enum: ['pending', 'uploaded'] })
+  status!: 'pending' | 'uploaded';
+
+  @ApiProperty({ example: 12345, nullable: true })
+  size!: number | null;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class AttachmentUploadResponseDto {
+  @ApiProperty({ type: TicketAttachmentDto })
+  attachment!: TicketAttachmentDto;
+
+  @ApiProperty({ type: SignedUrlDto })
+  upload!: SignedUrlDto;
+}
+
+class AttachmentDownloadResponseDto {
+  @ApiProperty({ type: TicketAttachmentDto })
+  attachment!: TicketAttachmentDto;
+
+  @ApiProperty({ type: SignedUrlDto })
+  download!: SignedUrlDto;
+}
+
+class PatchTicketDto {
+  @ApiProperty({ required: false, example: 'Fix login' })
+  title?: string;
+
+  @ApiProperty({ required: false, example: 'Details' })
+  description?: string;
+
+  @ApiProperty({ required: false, example: '2024-01-10T10:00:00.000Z', nullable: true })
+  dueDate?: string | null;
+}
+
+class CreateCommentDto {
+  @ApiProperty({ required: false, example: 'Looks good' })
+  content?: string;
+}
+
+class PatchCommentDto {
+  @ApiProperty({ required: false, example: 'Looks great' })
+  content?: string;
+}
+
+class AddAssigneeDto {
+  @ApiProperty({ required: false, example: 'usr_123' })
+  userId?: string;
+}
+
+class CreateChecklistDto {
+  @ApiProperty({ required: false, example: 'Release' })
+  title?: string;
+}
+
+class PatchChecklistDto {
+  @ApiProperty({ required: false, example: 'Release' })
+  title?: string;
+}
+
+class ReorderChecklistsDto {
+  @ApiProperty({ required: false, type: [String], example: ['chk_1', 'chk_2'] })
+  checklistIds?: string[];
+}
+
+class CreateChecklistItemDto {
+  @ApiProperty({ required: false, example: 'Do the thing' })
+  content?: string;
+}
+
+class PatchChecklistItemDto {
+  @ApiProperty({ required: false, example: 'Do the thing' })
+  content?: string;
+
+  @ApiProperty({ required: false, example: true })
+  isDone?: boolean;
+}
+
+class ReorderChecklistItemsDto {
+  @ApiProperty({ required: false, type: [String], example: ['item_1', 'item_2'] })
+  itemIds?: string[];
+}
+
+class AddLabelDto {
+  @ApiProperty({ required: false, example: 'label_123' })
+  labelId?: string;
+}
+
+class CreateAttachmentUploadUrlDto {
+  @ApiProperty({ required: false, example: 'spec.pdf' })
+  filename?: string;
+
+  @ApiProperty({ required: false, example: 'application/pdf' })
+  contentType?: string;
+
+  @ApiProperty({ required: false, example: true })
+  resumable?: boolean;
+}
+
+class CompleteAttachmentDto {
+  @ApiProperty({ required: false, example: 12345 })
+  size?: number;
+}
 
 @UseGuards(FirebaseAuthGuard)
+@ApiTags('tickets')
+@ApiBearerAuth('bearer')
 @Controller('/api/tickets')
 export class TicketController {
   constructor(
@@ -58,6 +342,7 @@ export class TicketController {
   }
 
   @Get('/:ticketId')
+  @ApiOkResponse({ type: TicketDetailsDto })
   async getTicket(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -82,6 +367,8 @@ export class TicketController {
   }
 
   @Patch('/:ticketId')
+  @ApiBody({ type: PatchTicketDto })
+  @ApiOkResponse({ type: TicketDto })
   async patchTicket(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -114,6 +401,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteTicket(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -130,6 +423,7 @@ export class TicketController {
 
   // Comments
   @Get('/:ticketId/comments')
+  @ApiOkResponse({ type: [TicketCommentDto] })
   async listComments(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -144,6 +438,8 @@ export class TicketController {
   }
 
   @Post('/:ticketId/comments')
+  @ApiBody({ type: CreateCommentDto })
+  @ApiOkResponse({ type: TicketCommentDto })
   async addComment(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -166,6 +462,8 @@ export class TicketController {
   }
 
   @Patch('/:ticketId/comments/:commentId')
+  @ApiBody({ type: PatchCommentDto })
+  @ApiOkResponse({ type: TicketCommentDto })
   async patchComment(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -189,6 +487,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId/comments/:commentId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteComment(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -209,6 +513,7 @@ export class TicketController {
 
   // Assignees
   @Get('/:ticketId/assignees')
+  @ApiOkResponse({ type: AssigneeIdsDto })
   async listAssignees(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -224,6 +529,13 @@ export class TicketController {
   }
 
   @Post('/:ticketId/assignees')
+  @ApiBody({ type: AddAssigneeDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async addAssignee(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -249,6 +561,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId/assignees/:userId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async removeAssignee(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -270,6 +588,7 @@ export class TicketController {
 
   // Labels (assigned on ticket)
   @Get('/:ticketId/labels')
+  @ApiOkResponse({ type: LabelIdsDto })
   async listLabels(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -285,6 +604,13 @@ export class TicketController {
   }
 
   @Post('/:ticketId/labels')
+  @ApiBody({ type: AddLabelDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async addLabel(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string, @Body() body: AddLabelDto) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -304,6 +630,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId/labels/:labelId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async removeLabel(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string, @Param('labelId') labelId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -321,6 +653,7 @@ export class TicketController {
 
   // Checklists
   @Get('/:ticketId/checklists')
+  @ApiOkResponse({ type: [TicketChecklistDto] })
   async listChecklists(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -335,6 +668,8 @@ export class TicketController {
   }
 
   @Post('/:ticketId/checklists')
+  @ApiBody({ type: CreateChecklistDto })
+  @ApiOkResponse({ type: TicketChecklistDto })
   async createChecklist(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string, @Body() body: CreateChecklistDto) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -353,6 +688,13 @@ export class TicketController {
   }
 
   @Patch('/:ticketId/checklists/order')
+  @ApiBody({ type: ReorderChecklistsDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async reorderChecklists(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -377,6 +719,8 @@ export class TicketController {
   }
 
   @Patch('/:ticketId/checklists/:checklistId')
+  @ApiBody({ type: PatchChecklistDto })
+  @ApiOkResponse({ type: TicketChecklistDto })
   async patchChecklist(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -400,6 +744,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId/checklists/:checklistId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteChecklist(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -420,6 +770,8 @@ export class TicketController {
 
   // Checklist items
   @Post('/:ticketId/checklists/:checklistId/items')
+  @ApiBody({ type: CreateChecklistItemDto })
+  @ApiOkResponse({ type: TicketChecklistItemDto })
   async addChecklistItem(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -443,6 +795,13 @@ export class TicketController {
   }
 
   @Patch('/:ticketId/checklists/:checklistId/items/order')
+  @ApiBody({ type: ReorderChecklistItemsDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async reorderChecklistItems(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -468,6 +827,8 @@ export class TicketController {
   }
 
   @Patch('/:ticketId/checklists/:checklistId/items/:itemId')
+  @ApiBody({ type: PatchChecklistItemDto })
+  @ApiOkResponse({ type: TicketChecklistItemDto })
   async patchChecklistItem(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -498,6 +859,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId/checklists/:checklistId/items/:itemId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteChecklistItem(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -520,6 +887,7 @@ export class TicketController {
 
   // Attachments (GCS signed URLs + metadata)
   @Get('/:ticketId/attachments')
+  @ApiOkResponse({ type: [TicketAttachmentDto] })
   async listAttachments(@CurrentUser() user: UserModel, @Param('ticketId') ticketId: string) {
     const ticket = await this.access.getTicketOrThrow(ticketId);
     const { role } = await this.access.getWorkspaceRoleForTicketOrThrow(user.id, ticket);
@@ -535,6 +903,8 @@ export class TicketController {
   }
 
   @Post('/:ticketId/attachments/upload-url')
+  @ApiBody({ type: CreateAttachmentUploadUrlDto })
+  @ApiOkResponse({ type: AttachmentUploadResponseDto })
   async createAttachmentUploadUrl(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -577,6 +947,8 @@ export class TicketController {
   }
 
   @Post('/:ticketId/attachments/:attachmentId/complete')
+  @ApiBody({ type: CompleteAttachmentDto })
+  @ApiOkResponse({ type: TicketAttachmentDto })
   async completeAttachment(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -602,6 +974,7 @@ export class TicketController {
   }
 
   @Get('/:ticketId/attachments/:attachmentId/download-url')
+  @ApiOkResponse({ type: AttachmentDownloadResponseDto })
   async getAttachmentDownloadUrl(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,
@@ -620,6 +993,12 @@ export class TicketController {
   }
 
   @Delete('/:ticketId/attachments/:attachmentId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteAttachment(
     @CurrentUser() user: UserModel,
     @Param('ticketId') ticketId: string,

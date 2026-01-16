@@ -1,3 +1,23 @@
+/**
+ * Design System Showcase Page
+ *
+ * Interactive demonstration of all UI components and design system patterns.
+ * Shows:
+ * - Board layout with columns and cards
+ * - Button variants and sizes
+ * - Dialog and dropdown menus
+ * - Form inputs and textarea
+ * - Card components
+ * - Toast notifications
+ * - Trello-like board interface mockup
+ *
+ * Useful for:
+ * - Component library reference
+ * - UI consistency verification
+ * - Component interaction testing
+ * - Designer/developer collaboration
+ */
+
 "use client";
 
 import { 
@@ -31,10 +51,20 @@ import { Plus, MoreHorizontal, Calendar, Paperclip, AlignLeft, CheckSquare } fro
 import { useState } from "react";
 import TrelloLayout from "@/components/layout/trello-layout";
 
+/**
+ * Design system showcase component.
+ * Renders a Trello-like board interface with interactive components.
+ *
+ * @returns The design system page with component examples
+ */
 export default function DesignSystemPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  /**
+   * Shows a toast notification example.
+   * Demonstrates the toast system usage.
+   */
   const handleShowToast = () => {
     toast({
       title: "Notification",
@@ -44,6 +74,7 @@ export default function DesignSystemPage() {
 
   return (
     <TrelloLayout>
+      {/* Global toast container */}
       <Toaster />
       <div className="h-full w-full p-4 overflow-x-auto">
         <div className="mb-6 flex items-center justify-between text-white">

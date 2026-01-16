@@ -10,14 +10,17 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       first_name: 'U',
       last_name: 'One',
       description: '',
+      avatar: null,
       createdAt: '',
       updatedAt: '',
     },
     users: {
-      getById: vi.fn(async () => ({ id: 'u2', username: 'x', first_name: 'X', last_name: 'Y', description: '', createdAt: '', updatedAt: '' })),
+      getById: vi.fn(async () => ({ id: 'u2', username: 'x', first_name: 'X', last_name: 'Y', description: '', avatar: null, createdAt: '', updatedAt: '' })),
       search: vi.fn(async () => []),
-      updateMe: vi.fn(async () => ({ id: 'u1', username: 'u', first_name: 'U', last_name: 'One', description: '', createdAt: '', updatedAt: '' })),
+      updateMe: vi.fn(async () => ({ id: 'u1', username: 'u', first_name: 'U', last_name: 'One', description: '', avatar: null, createdAt: '', updatedAt: '' })),
       deleteMe: vi.fn(async () => {}),
+      createAvatarUpload: vi.fn(async () => ({ objectPath: 'users/u1/avatar/x.png', upload: { url: 'u', method: 'PUT', headers: {} } })),
+      getAvatarDownload: vi.fn(async () => ({ url: 'u', method: 'GET', headers: {} })),
     },
     workspaces: {
       createWorkspace: vi.fn(async () => ({ id: 'w1', title: 'W', description: '', isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
@@ -62,6 +65,9 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       createTicket: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
       moveTicket: vi.fn(async () => {}),
       archiveTicket: vi.fn(async () => {}),
+    },
+    boardBackgrounds: {
+      list: vi.fn(async () => ({ items: [], nextCursor: null })),
     },
     tickets: {
       getById: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),

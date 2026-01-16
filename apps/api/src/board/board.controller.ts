@@ -10,21 +10,259 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, FirebaseAuthGuard } from '@taskly/auth';
-import type { UserModel } from '@taskly/database';
+import type { BoardBackground, UserModel } from '@taskly/database';
 import { BoardsService } from '@taskly/database';
 import { BoardAccessService } from './board-access.service.js';
 
-type PatchBoardDto = { title?: string; description?: string; background?: string | null };
-type CreateColumnDto = { title?: string; key?: string };
-type PatchColumnDto = { title?: string; key?: string };
-type ReorderColumnsDto = { columnIds?: string[] };
-type MoveTicketDto = { columnId?: string; position?: number };
-type CreateLabelDto = { name?: string; color?: string | null };
-type PatchLabelDto = { name?: string; color?: string | null };
-type ReorderLabelsDto = { labelIds?: string[] };
+class BoardStatsDto {
+  @ApiProperty({ example: 5, nullable: true })
+  columnsCount!: number | null;
+
+  @ApiProperty({ example: 42, nullable: true })
+  ticketsCount!: number | null;
+}
+
+class BoardDto {
+  @ApiProperty({ example: 'board_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ws_123' })
+  workspaceId!: string;
+
+  @ApiProperty({ example: 'Roadmap' })
+  title!: string;
+
+  @ApiProperty({ example: 'Product roadmap' })
+  description!: string;
+
+  @ApiProperty({ type: 'object', nullable: true })
+  background!: BoardBackground | null;
+
+  @ApiProperty({ example: 1 })
+  order!: number;
+
+  @ApiProperty({ example: false })
+  isArchived!: boolean;
+
+  @ApiProperty({ example: null, nullable: true })
+  archivedAt!: string | null;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class BoardDetailsDto {
+  @ApiProperty({ example: 'board_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ws_123' })
+  workspaceId!: string;
+
+  @ApiProperty({ example: 'Roadmap' })
+  title!: string;
+
+  @ApiProperty({ example: 'Product roadmap' })
+  description!: string;
+
+  @ApiProperty({ type: 'object', nullable: true })
+  background!: BoardBackground | null;
+
+  @ApiProperty({ example: 1 })
+  order!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+
+  @ApiProperty({ type: BoardStatsDto })
+  stats!: BoardStatsDto;
+}
+
+class BoardColumnDto {
+  @ApiProperty({ example: 'col_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'board_123' })
+  boardId!: string;
+
+  @ApiProperty({ example: 'Todo' })
+  title!: string;
+
+  @ApiProperty({ example: 'todo' })
+  key!: string;
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class BoardLabelDto {
+  @ApiProperty({ example: 'label_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'board_123' })
+  boardId!: string;
+
+  @ApiProperty({ example: 'Urgent' })
+  name!: string;
+
+  @ApiProperty({ example: '#FF0000' })
+  color!: string;
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class TicketListItemDto {
+  @ApiProperty({ example: 'ticket_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'board_123' })
+  boardId!: string;
+
+  @ApiProperty({ example: 'col_123' })
+  columnId!: string;
+
+  @ApiProperty({ example: 'Fix login' })
+  title!: string;
+
+  @ApiProperty({ required: false, nullable: true, example: 'Details' })
+  description?: string;
+
+  @ApiProperty({ type: [String], example: ['label_1', 'label_2'] })
+  labelIds!: string[];
+
+  @ApiProperty({ example: 0 })
+  position!: number;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class PatchBoardDto {
+  @ApiProperty({ required: false, example: 'Roadmap' })
+  title?: string;
+
+  @ApiProperty({ required: false, example: 'Product roadmap' })
+  description?: string;
+
+  @ApiProperty({ required: false, type: 'object', nullable: true })
+  background?: BoardBackground | string | null;
+}
+
+class CreateColumnDto {
+  @ApiProperty({ required: false, example: 'Todo' })
+  title?: string;
+
+  @ApiProperty({ required: false, example: 'todo' })
+  key?: string;
+}
+
+class PatchColumnDto {
+  @ApiProperty({ required: false, example: 'Todo' })
+  title?: string;
+
+  @ApiProperty({ required: false, example: 'todo' })
+  key?: string;
+}
+
+class ReorderColumnsDto {
+  @ApiProperty({ required: false, type: [String], example: ['col_1', 'col_2'] })
+  columnIds?: string[];
+}
+
+class MoveTicketDto {
+  @ApiProperty({ required: false, example: 'col_123' })
+  columnId?: string;
+
+  @ApiProperty({ required: false, example: 3 })
+  position?: number;
+}
+
+class CreateLabelDto {
+  @ApiProperty({ required: false, example: 'Urgent' })
+  name?: string;
+
+  @ApiProperty({ required: false, example: '#FF0000', nullable: true })
+  color?: string | null;
+}
+
+class PatchLabelDto {
+  @ApiProperty({ required: false, example: 'Urgent' })
+  name?: string;
+
+  @ApiProperty({ required: false, example: '#FF0000', nullable: true })
+  color?: string | null;
+}
+
+class ReorderLabelsDto {
+  @ApiProperty({ required: false, type: [String], example: ['label_1', 'label_2'] })
+  labelIds?: string[];
+}
+
+function parseBoardBackgroundInput(input: unknown): BoardBackground | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === 'string') {
+    const value = input.trim();
+    if (!value) return null;
+    return { type: 'color', value };
+  }
+  if (typeof input !== 'object') return null;
+  const data = input as { type?: unknown; value?: unknown };
+  if (data.type === 'color' || data.type === 'gradient') {
+    if (typeof data.value !== 'string') return null;
+    const value = data.value.trim();
+    if (!value) return null;
+    return { type: data.type, value };
+  }
+  if (data.type === 'image') {
+    if (typeof data.value !== 'object' || !data.value) return null;
+    const value = data.value as Record<string, unknown>;
+    const id = typeof value.id === 'string' ? value.id : '';
+    const url = typeof value.url === 'string' ? value.url : '';
+    const thumbUrl = typeof value.thumbUrl === 'string' ? value.thumbUrl : '';
+    if (!id || !url || !thumbUrl) return null;
+    return {
+      type: 'image',
+      value: {
+        source: value.source === 'unsplash' ? 'unsplash' : 'unsplash',
+        id,
+        url,
+        thumbUrl,
+        blurHash: typeof value.blurHash === 'string' ? value.blurHash : null,
+        color: typeof value.color === 'string' ? value.color : null,
+        authorName: typeof value.authorName === 'string' ? value.authorName : null,
+        authorUrl: typeof value.authorUrl === 'string' ? value.authorUrl : null,
+      },
+    };
+  }
+  return null;
+}
 
 @UseGuards(FirebaseAuthGuard)
+@ApiTags('boards')
+@ApiBearerAuth('bearer')
 @Controller('/api/boards')
 export class BoardController {
   constructor(
@@ -33,6 +271,7 @@ export class BoardController {
   ) {}
 
   @Get('/:boardId')
+  @ApiOkResponse({ type: BoardDetailsDto })
   async getBoard(@CurrentUser() user: UserModel, @Param('boardId') boardId: string) {
     const board = await this.access.getBoardOrThrow(boardId);
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
@@ -63,6 +302,8 @@ export class BoardController {
   }
 
   @Patch('/:boardId')
+  @ApiBody({ type: PatchBoardDto })
+  @ApiOkResponse({ type: BoardDto })
   async patchBoard(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -72,20 +313,29 @@ export class BoardController {
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
     this.access.requirePermission(role, 'board.meta.write');
 
-    const patch: { title?: string; description?: string; background?: string | null } = {};
+    const patch: { title?: string; description?: string; background?: BoardBackground | null } = {};
     if (typeof body.title === 'string') {
       const t = body.title.trim();
       if (!t) throw new BadRequestException('title cannot be empty');
       patch.title = t;
     }
     if (typeof body.description === 'string') patch.description = body.description.trim();
-    if (body.background === null || typeof body.background === 'string') patch.background = body.background;
+    if (Object.prototype.hasOwnProperty.call(body, 'background')) {
+      if (body.background === null) {
+        patch.background = null;
+      } else {
+        const parsed = parseBoardBackgroundInput(body.background);
+        if (!parsed) throw new BadRequestException('background is invalid');
+        patch.background = parsed;
+      }
+    }
 
     return await this.boards.updateBoard(boardId, patch);
   }
 
   // Columns
   @Get('/:boardId/columns')
+  @ApiOkResponse({ type: [BoardColumnDto] })
   async listColumns(@CurrentUser() user: UserModel, @Param('boardId') boardId: string) {
     const board = await this.access.getBoardOrThrow(boardId);
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
@@ -94,6 +344,8 @@ export class BoardController {
   }
 
   @Post('/:boardId/columns')
+  @ApiBody({ type: CreateColumnDto })
+  @ApiOkResponse({ type: BoardColumnDto })
   async createColumn(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -112,6 +364,8 @@ export class BoardController {
   }
 
   @Patch('/:boardId/columns/:columnId')
+  @ApiBody({ type: PatchColumnDto })
+  @ApiOkResponse({ type: BoardColumnDto })
   async patchColumn(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -137,6 +391,12 @@ export class BoardController {
   }
 
   @Delete('/:boardId/columns/:columnId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteColumn(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -154,6 +414,13 @@ export class BoardController {
   }
 
   @Patch('/:boardId/columns/order')
+  @ApiBody({ type: ReorderColumnsDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async reorderColumns(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -176,6 +443,7 @@ export class BoardController {
 
   // Labels
   @Get('/:boardId/labels')
+  @ApiOkResponse({ type: [BoardLabelDto] })
   async listLabels(@CurrentUser() user: UserModel, @Param('boardId') boardId: string) {
     const board = await this.access.getBoardOrThrow(boardId);
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
@@ -184,6 +452,8 @@ export class BoardController {
   }
 
   @Post('/:boardId/labels')
+  @ApiBody({ type: CreateLabelDto })
+  @ApiOkResponse({ type: BoardLabelDto })
   async createLabel(@CurrentUser() user: UserModel, @Param('boardId') boardId: string, @Body() body: CreateLabelDto) {
     const board = await this.access.getBoardOrThrow(boardId);
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
@@ -208,6 +478,13 @@ export class BoardController {
   }
 
   @Patch('/:boardId/labels/order')
+  @ApiBody({ type: ReorderLabelsDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async reorderLabels(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -230,6 +507,8 @@ export class BoardController {
   }
 
   @Patch('/:boardId/labels/:labelId')
+  @ApiBody({ type: PatchLabelDto })
+  @ApiOkResponse({ type: BoardLabelDto })
   async patchLabel(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -259,6 +538,12 @@ export class BoardController {
   }
 
   @Delete('/:boardId/labels/:labelId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteLabel(@CurrentUser() user: UserModel, @Param('boardId') boardId: string, @Param('labelId') labelId: string) {
     const board = await this.access.getBoardOrThrow(boardId);
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
@@ -269,6 +554,7 @@ export class BoardController {
 
   // Tickets
   @Get('/:boardId/tickets')
+  @ApiOkResponse({ type: [TicketListItemDto] })
   async listTickets(@CurrentUser() user: UserModel, @Param('boardId') boardId: string) {
     const board = await this.access.getBoardOrThrow(boardId);
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
@@ -290,6 +576,7 @@ export class BoardController {
   }
 
   @Get('/:boardId/columns/:columnId/tickets')
+  @ApiOkResponse({ type: [TicketListItemDto] })
   async listTicketsByColumn(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -315,6 +602,13 @@ export class BoardController {
   }
 
   @Patch('/:boardId/tickets/:ticketId/move')
+  @ApiBody({ type: MoveTicketDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async moveTicket(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,
@@ -340,6 +634,12 @@ export class BoardController {
   }
 
   @Delete('/:boardId/tickets/:ticketId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async deleteTicket(
     @CurrentUser() user: UserModel,
     @Param('boardId') boardId: string,

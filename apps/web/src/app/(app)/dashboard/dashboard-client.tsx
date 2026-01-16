@@ -1,3 +1,18 @@
+/**
+ * Dashboard Page Client Component
+ *
+ * Main dashboard showing all workspaces and their boards.
+ * Allows creating new workspaces and viewing boards across workspaces.
+ *
+ * Features:
+ * - Workspace list with pagination
+ * - Board preview cards with backgrounds
+ * - Board quick navigation
+ * - Create workspace dialog
+ * - Responsive grid layout
+ * - Board loading states
+ */
+
 'use client';
 
 import Link from 'next/link';
@@ -17,12 +32,24 @@ import {
   Textarea,
 } from '@taskly/ui';
 import { api } from '@/app/trpc';
+import { getBoardBackgroundStyle } from '@/components/board/board-background';
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Pagination constants
 const WORKSPACES_PER_PAGE = 3;
 const BOARDS_PER_PAGE = 8;
 
+/**
+ * Section displaying boards within a workspace.
+ * Shows paginated board grid with backgrounds.
+ * Handles loading and empty states.
+ *
+ * @param props - Component props
+ * @param props.workspace - Workspace object
+ * @param props.boardsPage - Current page number
+ * @param props.setBoardsPage - Callback to update page
+ */
 function WorkspaceBoardsSection({
   workspace,
   boardsPage,
@@ -32,6 +59,7 @@ function WorkspaceBoardsSection({
   boardsPage: number;
   setBoardsPage: (next: number) => void;
 }) {
+  // Query boards for this workspace
   const boardsQuery = api.workspaces.boards.list.useQuery({ workspaceId: workspace.id });
   const boards = boardsQuery.data ?? [];
 
@@ -51,9 +79,12 @@ function WorkspaceBoardsSection({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {pageBoards.map((b) => (
               <Link key={b.id} href={`/dashboard/boards/${b.id}`} className="group">
-                <div className="h-24 rounded-lg border border-[#9fadbc29] bg-[#1d2125] hover:bg-[#22272b] transition-colors p-4 flex flex-col justify-between">
-                  <div className="text-sm font-semibold text-[#b6c2cf] group-hover:text-white truncate">{b.title}</div>
-                  <div className="text-xs text-[#9fadbc]">Ouvrir →</div>
+                <div className="h-24 rounded-lg border border-[#9fadbc29] bg-[#1d2125] hover:bg-[#22272b] transition-colors overflow-hidden flex flex-col">
+                  <div className="h-8" style={getBoardBackgroundStyle(b.background, { preferThumb: true })} />
+                  <div className="flex-1 p-3 flex flex-col justify-between">
+                    <div className="text-sm font-semibold text-[#b6c2cf] group-hover:text-white truncate">{b.title}</div>
+                    <div className="text-xs text-[#9fadbc]">Ouvrir →</div>
+                  </div>
                 </div>
               </Link>
             ))}

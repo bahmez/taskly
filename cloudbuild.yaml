@@ -7,6 +7,8 @@ substitutions:
   _CRON_SECRET: ""
   # Google Cloud Storage bucket for ticket attachments (API runtime)
   _GCS_BUCKET: ""
+  # Unsplash access key (API runtime)
+  _UNSPLASH_ACCESS_KEY: ""
   # URL publique de l'API (utilisée au build Next.js)
   _NEXT_PUBLIC_API_URL: ""
   # Firebase Web (utilisées au build Next.js pour le code client)
@@ -65,6 +67,7 @@ steps:
         CORS_ORIGIN=${_CORS_ORIGIN},
         CRON_SECRET=${_CRON_SECRET},
         GCS_BUCKET=${_GCS_BUCKET},
+        UNSPLASH_ACCESS_KEY=${_UNSPLASH_ACCESS_KEY},
         NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL},
         NEXT_PUBLIC_FIREBASE_API_KEY=${_NEXT_PUBLIC_FIREBASE_API_KEY},
         NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN},
