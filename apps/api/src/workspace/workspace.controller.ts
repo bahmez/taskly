@@ -12,20 +12,231 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser, FirebaseAuthGuard } from '@taskly/auth';
 import type { BoardBackground, UserModel, WorkspaceRole } from '@taskly/database';
 import { BoardsService, UsersService, WorkspacesService } from '@taskly/database';
 import { canAssignRole } from './permissions.js';
 import { WorkspaceAccessService } from './workspace-access.service.js';
 
-type CreateWorkspaceDto = { title?: string; description?: string };
-type PatchWorkspaceDto = { title?: string; description?: string };
+class WorkspaceListItemDto {
+  @ApiProperty({ example: 'ws_123' })
+  id!: string;
 
-type AddMemberDto = { userId?: string; role?: WorkspaceRole };
-type PatchMemberDto = { role?: WorkspaceRole };
+  @ApiProperty({ example: 'Acme Workspace' })
+  title!: string;
 
-type CreateBoardDto = { title?: string; background?: BoardBackground | string | null; backgroundColor?: string | null };
-type ReorderBoardsDto = { boardIds?: string[] };
+  @ApiProperty({ example: 'Main team workspace' })
+  description!: string;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class WorkspaceStatsDto {
+  @ApiProperty({ example: 5 })
+  membersCount!: number;
+
+  @ApiProperty({ example: 12 })
+  boardsCount!: number;
+}
+
+class WorkspaceDetailsDto {
+  @ApiProperty({ example: 'ws_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'Acme Workspace' })
+  title!: string;
+
+  @ApiProperty({ example: 'Main team workspace' })
+  description!: string;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+
+  @ApiProperty({ type: WorkspaceStatsDto })
+  stats!: WorkspaceStatsDto;
+}
+
+class WorkspaceDto {
+  @ApiProperty({ example: 'ws_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'Acme Workspace' })
+  title!: string;
+
+  @ApiProperty({ example: 'Main team workspace' })
+  description!: string;
+
+  @ApiProperty({ example: false })
+  isArchived!: boolean;
+
+  @ApiProperty({ example: null, nullable: true })
+  archivedAt!: string | null;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class WorkspaceMemberDto {
+  @ApiProperty({ example: 'usr_123' })
+  userId!: string;
+
+  @ApiProperty({ enum: ['admin', 'maintainer', 'editor', 'viewer'] })
+  role!: WorkspaceRole;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class WorkspaceInvitationDto {
+  @ApiProperty({ example: 'inv_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ws_123' })
+  workspaceId!: string;
+
+  @ApiProperty({ example: 'token_abc' })
+  token!: string;
+
+  @ApiProperty({ enum: ['admin', 'maintainer', 'editor', 'viewer'] })
+  role!: WorkspaceRole;
+
+  @ApiProperty({ example: 'usr_123' })
+  createdBy!: string;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-08T10:00:00.000Z' })
+  expiresAt!: string;
+
+  @ApiProperty({ example: null, nullable: true })
+  acceptedAt!: string | null;
+
+  @ApiProperty({ example: null, nullable: true })
+  acceptedBy!: string | null;
+
+  @ApiProperty({ example: null, nullable: true })
+  declinedAt!: string | null;
+
+  @ApiProperty({ example: null, nullable: true })
+  declinedBy!: string | null;
+
+  @ApiProperty({ example: null, nullable: true })
+  cancelledAt!: string | null;
+
+  @ApiProperty({ example: null, nullable: true })
+  cancelledBy!: string | null;
+}
+
+class WorkspaceInvitationWithUrlDto extends WorkspaceInvitationDto {
+  @ApiProperty({ example: 'https://app.taskly.dev/invite/token_abc', nullable: true })
+  inviteUrl!: string | null;
+}
+
+class BoardDto {
+  @ApiProperty({ example: 'board_123' })
+  id!: string;
+
+  @ApiProperty({ example: 'ws_123' })
+  workspaceId!: string;
+
+  @ApiProperty({ example: 'Roadmap' })
+  title!: string;
+
+  @ApiProperty({ example: 'Product roadmap' })
+  description!: string;
+
+  @ApiProperty({ type: 'object', nullable: true })
+  background!: BoardBackground | null;
+
+  @ApiProperty({ example: 1 })
+  order!: number;
+
+  @ApiProperty({ example: false })
+  isArchived!: boolean;
+
+  @ApiProperty({ example: null, nullable: true })
+  archivedAt!: string | null;
+
+  @ApiProperty({ example: '2024-01-01T10:00:00.000Z' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2024-01-02T10:00:00.000Z' })
+  updatedAt!: string;
+}
+
+class CreateWorkspaceDto {
+  @ApiProperty({ required: false, example: 'Acme Workspace' })
+  title?: string;
+
+  @ApiProperty({ required: false, example: 'Main team workspace' })
+  description?: string;
+}
+
+class PatchWorkspaceDto {
+  @ApiProperty({ required: false, example: 'Acme Workspace' })
+  title?: string;
+
+  @ApiProperty({ required: false, example: 'Main team workspace' })
+  description?: string;
+}
+
+class AddMemberDto {
+  @ApiProperty({ required: false, example: 'usr_123' })
+  userId?: string;
+
+  @ApiProperty({ required: false, enum: ['admin', 'maintainer', 'editor', 'viewer'] })
+  role?: WorkspaceRole;
+}
+
+class PatchMemberDto {
+  @ApiProperty({ required: false, enum: ['admin', 'maintainer', 'editor', 'viewer'] })
+  role?: WorkspaceRole;
+}
+
+class CreateBoardDto {
+  @ApiProperty({ required: false, example: 'Roadmap' })
+  title?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Board background as object or string.',
+    type: 'object',
+  })
+  background?: BoardBackground | string | null;
+
+  @ApiProperty({
+    required: false,
+    description: 'Legacy background color (hex or CSS).',
+    example: '#FFAA00',
+  })
+  backgroundColor?: string | null;
+}
+
+class ReorderBoardsDto {
+  @ApiProperty({ required: false, type: [String], example: ['board_1', 'board_2'] })
+  boardIds?: string[];
+}
 
 function parseBoardBackgroundInput(input: unknown): BoardBackground | null {
   if (input === null || input === undefined) return null;
@@ -66,7 +277,13 @@ function parseBoardBackgroundInput(input: unknown): BoardBackground | null {
   return null;
 }
 
-type CreateInvitationDto = { role?: WorkspaceRole; expiresInDays?: number };
+class CreateInvitationDto {
+  @ApiProperty({ required: false, enum: ['admin', 'maintainer', 'editor', 'viewer'] })
+  role?: WorkspaceRole;
+
+  @ApiProperty({ required: false, example: 7 })
+  expiresInDays?: number;
+}
 
 function asRole(x: unknown): WorkspaceRole | null {
   if (x === 'admin' || x === 'maintainer' || x === 'editor' || x === 'viewer') return x;
@@ -84,6 +301,8 @@ function addDaysIso(days: number): string {
 }
 
 @UseGuards(FirebaseAuthGuard)
+@ApiTags('workspaces')
+@ApiBearerAuth('bearer')
 @Controller('/api/workspaces')
 export class WorkspaceController {
   constructor(
@@ -94,6 +313,7 @@ export class WorkspaceController {
   ) {}
 
   @Get()
+  @ApiOkResponse({ type: [WorkspaceListItemDto] })
   async list(@CurrentUser() user: UserModel) {
     // Any member role includes workspace.meta.read per mapping.
     const workspaces = await this.workspaces.listWorkspacesForUser(user.id);
@@ -107,6 +327,8 @@ export class WorkspaceController {
   }
 
   @Post()
+  @ApiBody({ type: CreateWorkspaceDto })
+  @ApiOkResponse({ type: WorkspaceDto })
   async create(@CurrentUser() user: UserModel, @Body() body: CreateWorkspaceDto) {
     const title = (body.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
@@ -118,6 +340,7 @@ export class WorkspaceController {
   }
 
   @Get('/:workspaceId')
+  @ApiOkResponse({ type: WorkspaceDetailsDto })
   async get(@CurrentUser() user: UserModel, @Param('workspaceId') workspaceId: string) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.meta.read');
 
@@ -143,6 +366,8 @@ export class WorkspaceController {
   }
 
   @Patch('/:workspaceId')
+  @ApiBody({ type: PatchWorkspaceDto })
+  @ApiOkResponse({ type: WorkspaceDto })
   async patch(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -164,6 +389,12 @@ export class WorkspaceController {
   }
 
   @Delete('/:workspaceId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async remove(@CurrentUser() user: UserModel, @Param('workspaceId') workspaceId: string) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.meta.write');
     await this.workspaces.archiveWorkspace(workspaceId);
@@ -172,12 +403,15 @@ export class WorkspaceController {
 
   // Members
   @Get('/:workspaceId/members')
+  @ApiOkResponse({ type: [WorkspaceMemberDto] })
   async members(@CurrentUser() user: UserModel, @Param('workspaceId') workspaceId: string) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.members.read');
     return await this.workspaces.listMembers(workspaceId);
   }
 
   @Post('/:workspaceId/members')
+  @ApiBody({ type: AddMemberDto })
+  @ApiOkResponse({ type: WorkspaceMemberDto })
   async addMember(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -205,6 +439,8 @@ export class WorkspaceController {
   }
 
   @Patch('/:workspaceId/members/:userId')
+  @ApiBody({ type: PatchMemberDto })
+  @ApiOkResponse({ type: WorkspaceMemberDto })
   async patchMember(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -236,6 +472,12 @@ export class WorkspaceController {
   }
 
   @Delete('/:workspaceId/members/:userId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async removeMember(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -257,12 +499,15 @@ export class WorkspaceController {
 
   // Boards
   @Get('/:workspaceId/boards')
+  @ApiOkResponse({ type: [BoardDto] })
   async boards(@CurrentUser() user: UserModel, @Param('workspaceId') workspaceId: string) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.boards.read');
     return await this.boardsService.listBoardsForWorkspace(workspaceId);
   }
 
   @Post('/:workspaceId/boards')
+  @ApiBody({ type: CreateBoardDto })
+  @ApiOkResponse({ type: BoardDto })
   async createBoard(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -285,6 +530,13 @@ export class WorkspaceController {
   }
 
   @Patch('/:workspaceId/boards/order')
+  @ApiBody({ type: ReorderBoardsDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async reorderBoards(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -307,6 +559,12 @@ export class WorkspaceController {
   }
 
   @Delete('/:workspaceId/boards/:boardId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async removeBoard(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -320,6 +578,8 @@ export class WorkspaceController {
 
   // Invitations
   @Post('/:workspaceId/invitations')
+  @ApiBody({ type: CreateInvitationDto })
+  @ApiOkResponse({ type: WorkspaceInvitationWithUrlDto })
   async createInvitation(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -350,12 +610,19 @@ export class WorkspaceController {
   }
 
   @Get('/:workspaceId/invitations')
+  @ApiOkResponse({ type: [WorkspaceInvitationDto] })
   async listInvitations(@CurrentUser() user: UserModel, @Param('workspaceId') workspaceId: string) {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.members.write');
     return await this.workspaces.listPendingInvitations(workspaceId);
   }
 
   @Delete('/:workspaceId/invitations/:invitationId')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean', example: true } },
+    },
+  })
   async cancelInvitation(
     @CurrentUser() user: UserModel,
     @Param('workspaceId') workspaceId: string,
@@ -369,6 +636,7 @@ export class WorkspaceController {
   }
 
   @Post('/invitations/:token/accept')
+  @ApiOkResponse({ type: WorkspaceMemberDto })
   async accept(@CurrentUser() user: UserModel, @Param('token') token: string) {
     const t = (token ?? '').trim();
     if (!t) throw new BadRequestException('token is required');
@@ -380,6 +648,7 @@ export class WorkspaceController {
   }
 
   @Post('/invitations/:token/decline')
+  @ApiOkResponse({ type: WorkspaceInvitationDto })
   async decline(@CurrentUser() user: UserModel, @Param('token') token: string) {
     const t = (token ?? '').trim();
     if (!t) throw new BadRequestException('token is required');

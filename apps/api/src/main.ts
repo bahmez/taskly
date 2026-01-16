@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 import cors from 'cors';
@@ -61,6 +62,24 @@ async function bootstrap() {
   // Optionnel: Nest gère aussi CORS pour ses routes (ex: /health).
   // On le laisse, mais l'important est le middleware Express ci-dessus.
   app.enableCors();
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Taskly API')
+    .setDescription('Documentation de l’API REST Taskly')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'bearer',
+    )
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('/docs', app, swaggerDocument, {
+    swaggerOptions: { persistAuthorization: true },
+  });
 
   const firebaseAuth = app.get(FIREBASE_AUTH) as unknown as {
     verifyIdToken: (token: string) => Promise<{ uid: string } & Record<string, unknown>>;
