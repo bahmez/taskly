@@ -1,3 +1,18 @@
+/**
+ * Dashboard Page Client Component
+ *
+ * Main dashboard showing all workspaces and their boards.
+ * Allows creating new workspaces and viewing boards across workspaces.
+ *
+ * Features:
+ * - Workspace list with pagination
+ * - Board preview cards with backgrounds
+ * - Board quick navigation
+ * - Create workspace dialog
+ * - Responsive grid layout
+ * - Board loading states
+ */
+
 'use client';
 
 import Link from 'next/link';
@@ -21,9 +36,20 @@ import { getBoardBackgroundStyle } from '@/components/board/board-background';
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Pagination constants
 const WORKSPACES_PER_PAGE = 3;
 const BOARDS_PER_PAGE = 8;
 
+/**
+ * Section displaying boards within a workspace.
+ * Shows paginated board grid with backgrounds.
+ * Handles loading and empty states.
+ *
+ * @param props - Component props
+ * @param props.workspace - Workspace object
+ * @param props.boardsPage - Current page number
+ * @param props.setBoardsPage - Callback to update page
+ */
 function WorkspaceBoardsSection({
   workspace,
   boardsPage,
@@ -33,6 +59,7 @@ function WorkspaceBoardsSection({
   boardsPage: number;
   setBoardsPage: (next: number) => void;
 }) {
+  // Query boards for this workspace
   const boardsQuery = api.workspaces.boards.list.useQuery({ workspaceId: workspace.id });
   const boards = boardsQuery.data ?? [];
 

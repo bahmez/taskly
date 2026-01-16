@@ -1,3 +1,20 @@
+/**
+ * Application Navigation Bar Component
+ *
+ * Top-level navigation bar displayed across all authenticated pages.
+ * Features:
+ * - Workspace switcher with dropdown
+ * - Search functionality
+ * - Notifications bell with dropdown list
+ * - User profile menu (avatar, profile edit, logout)
+ * - Workspace creation and board management shortcuts
+ *
+ * Contains multiple sub-dialogs:
+ * - Workspace creation dialog
+ * - User profile edit dialog
+ * - Workspace invitations dialog
+ */
+
 "use client"
 
 import * as React from "react"
@@ -30,7 +47,12 @@ import { updateProfile } from "firebase/auth"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { getBoardBackgroundStyle } from "@/components/board/board-background"
 
-
+/**
+ * Formats notification timestamp for display.
+ * Handles both ISO strings and millisecond timestamps.
+ * @param input - Object with createdAt (ISO string) or createdAtMs (number)
+ * @returns Formatted local time string or empty string if invalid
+ */
 function formatNotificationTime(input: { createdAt?: string; createdAtMs?: number }) {
   const ms = Number.isFinite(input.createdAtMs) ? (input.createdAtMs as number) : undefined
   const date = ms ? new Date(ms) : input.createdAt ? new Date(input.createdAt) : null

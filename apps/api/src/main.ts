@@ -1,3 +1,17 @@
+/**
+ * Taskly API Entry Point
+ *
+ * This is the main bootstrap file for the Taskly API server.
+ * It initializes:
+ * - Express server with CORS configuration
+ * - NestJS application with Swagger documentation
+ * - Firebase authentication and tRPC middleware
+ * - Database services and Google Cloud Storage integration
+ *
+ * The API serves both REST endpoints (via NestJS controllers)
+ * and tRPC procedures mounted at /trpc.
+ */
+
 import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
@@ -23,6 +37,11 @@ import { GcsService } from './gcs/gcs.service.js';
 import { BoardBackgroundsService } from './board/board-backgrounds.service.js';
 import crypto from 'node:crypto';
 
+/**
+ * Extracts and validates a Bearer token from the Authorization header.
+ * @param header - The Authorization header value
+ * @returns The JWT token if valid, or null if missing/invalid format
+ */
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;
   const [type, token] = header.split(' ');
@@ -30,27 +49,52 @@ function extractBearerToken(header: string | undefined): string | null {
   return token;
 }
 
+/**
+ * Sanitizes a filename by removing path separators and limiting length.
+ * @param name - The filename to sanitize
+ * @returns Sanitized filename (max 200 chars)
+ */
 function sanitizeFilename(name: string): string {
   const base = name.replace(/[/\\]/g, '_').trim();
   return base.slice(0, 200) || 'file';
 }
 
+/**
+ * Builds a GCS object path for ticket attachments.
+ * Includes board/ticket hierarchy and random suffix for uniqueness.
+ * @param boardId - The board ID
+ * @param ticketId - The ticket ID
+ * @param filename - The original filename
+ * @returns GCS object path: boards/{boardId}/tickets/{ticketId}/{randomHex}-{filename}
+ */
 function buildObjectPath(boardId: string, ticketId: string, filename: string): string {
   const safe = sanitizeFilename(filename);
   const rand = crypto.randomBytes(8).toString('hex');
   return `boards/${boardId}/tickets/${ticketId}/${rand}-${safe}`;
 }
 
+/**
+ * Builds a GCS object path for user avatar images.
+ * Includes user hierarchy and random suffix for uniqueness.
+ * @param userId - The user ID
+ * @param filename - The original filename
+ * @returns GCS object path: users/{userId}/avatar/{randomHex}-{filename}
+ */
 function buildUserAvatarPath(userId: string, filename: string): string {
   const safe = sanitizeFilename(filename);
   const rand = crypto.randomBytes(8).toString('hex');
   return `users/${userId}/avatar/${rand}-${safe}`;
 }
 
+/**
+ * Bootstrap function that initializes the entire API server.
+ * Sets up Express, NestJS, Swagger, Swagger authentication, and tRPC.
+ */
 async function bootstrap() {
+  // Initialize Express server instance
   const server = express();
 
-  // CORS au niveau Express, pour couvrir aussi le middleware tRPC monté sur Express.
+  // Apply CORS middleware at Express level to cover both REST and tRPC routes
   server.use(
     cors({
       origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
@@ -58,15 +102,17 @@ async function bootstrap() {
     }),
   );
 
+  // Create and initialize NestJS application with Express adapter
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
-  // Optionnel: Nest gère aussi CORS pour ses routes (ex: /health).
-  // On le laisse, mais l'important est le middleware Express ci-dessus.
+  // Also enable CORS at NestJS level (for /health and other direct routes)
   app.enableCors();
 
+  // Configure Swagger/OpenAPI documentation
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Taskly API')
-    .setDescription('Documentation de l’API REST Taskly')
+    .setDescription('REST API documentation for Taskly - workspace, board, and ticket management system')
     .setVersion('1.0')
+    // Configure Bearer token authentication for Swagger UI
     .addBearerAuth(
       {
         type: 'http',
@@ -77,17 +123,20 @@ async function bootstrap() {
     )
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  // Setup Swagger UI at /docs endpoint with persistent auth
   SwaggerModule.setup('/docs', app, swaggerDocument, {
     swaggerOptions: { persistAuthorization: true },
   });
 
+  // Retrieve Firebase authentication service for token verification
   const firebaseAuth = app.get(FIREBASE_AUTH) as unknown as {
     verifyIdToken: (token: string) => Promise<{ uid: string } & Record<string, unknown>>;
   };
+
+  // Log Firebase configuration in development mode
   if (process.env.NODE_ENV !== 'production') {
     try {
       const firebaseApp = app.get(FIREBASE_ADMIN_APP) as unknown as { options?: { projectId?: string } };
-      // Note: firestore.projectId may throw "Client is not yet ready", so we don't touch it here.
       // eslint-disable-next-line no-console
       console.log('[firebase-admin] effective projectId', {
         appProjectId: firebaseApp?.options?.projectId ?? null,
@@ -100,6 +149,8 @@ async function bootstrap() {
       console.warn('[firebase-admin] could not log effective projectId', e);
     }
   }
+
+  // Retrieve all database and service providers from NestJS container
   const usersService = app.get(UsersService);
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
@@ -110,14 +161,17 @@ async function bootstrap() {
   const activityLogsService = app.get(ActivityLogsService);
   const gcsService = app.get(GcsService);
 
+  // Dynamically import tRPC app router
   const mod = await import('@taskly/trpc');
   const appRouter = (mod as { appRouter: AppRouter }).appRouter;
 
-  // tRPC endpoint (after Nest is created, so we can reuse its providers)
+  // Mount tRPC middleware on Express server
+  // This must be after NestJS is created so we can reuse its providers
   server.use(
     '/trpc',
     createExpressMiddleware<AppRouter>({
       router: appRouter,
+      // Error handler for tRPC procedures
       onError({ error, path, type, req }) {
         if (process.env.NODE_ENV !== 'production') {
           const cause = error.cause as
@@ -152,14 +206,18 @@ async function bootstrap() {
           }
         }
       },
+      // Create tRPC context with authenticated user and database services
       createContext: async ({ req }): Promise<Context> => {
+        // Extract and validate Bearer token from request headers
         const token = extractBearerToken(req.headers.authorization);
 
+        // User service wrapper with additional GCS operations
         const users = {
           getById: usersService.getById.bind(usersService),
           search: usersService.search.bind(usersService),
           updateMe: usersService.updateMe.bind(usersService),
           deleteMe: usersService.deleteMe.bind(usersService),
+          // Generate signed upload URL for user avatar
           createAvatarUpload: async (userId: string, input: { filename: string; contentType: string; resumable?: boolean }) => {
             const filename = sanitizeFilename(input.filename);
             const contentType = input.contentType.trim() || 'application/octet-stream';
@@ -171,11 +229,13 @@ async function bootstrap() {
             });
             return { objectPath, upload };
           },
+          // Generate signed download URL for user avatar
           getAvatarDownload: async (objectPath: string) => {
             return await gcsService.signedDownloadUrl({ objectPath });
           },
         };
 
+        // Workspace service wrapper with member and invitation operations
         const workspaces = {
           createWorkspace: workspacesService.createWorkspace.bind(workspacesService),
           getWorkspaceById: workspacesService.getWorkspaceById.bind(workspacesService),
@@ -184,14 +244,14 @@ async function bootstrap() {
           unarchiveWorkspace: workspacesService.unarchiveWorkspace.bind(workspacesService),
           listWorkspacesForUser: workspacesService.listWorkspacesForUser.bind(workspacesService),
           listArchivedWorkspacesForUser: workspacesService.listArchivedWorkspacesForUser.bind(workspacesService),
-
+          // Member management
           getMember: workspacesService.getMember.bind(workspacesService),
           upsertMember: workspacesService.upsertMember.bind(workspacesService),
           removeMember: workspacesService.removeMember.bind(workspacesService),
           listMembers: workspacesService.listMembers.bind(workspacesService),
           countMembers: workspacesService.countMembers.bind(workspacesService),
           countAdmins: workspacesService.countAdmins.bind(workspacesService),
-
+          // Invitation management
           createInvitation: workspacesService.createInvitation.bind(workspacesService),
           listPendingInvitations: workspacesService.listPendingInvitations.bind(workspacesService),
           getInvitation: workspacesService.getInvitation.bind(workspacesService),
@@ -200,27 +260,29 @@ async function bootstrap() {
           declineInvitationByToken: workspacesService.declineInvitationByToken.bind(workspacesService),
         };
 
+        // Board service wrapper with columns, labels, and tickets operations
         const boards = {
+          // Board CRUD
           getBoardById: boardsService.getBoardById.bind(boardsService),
           updateBoard: boardsService.updateBoard.bind(boardsService),
           archiveBoard: boardsService.archiveBoard.bind(boardsService),
-
+          // Board listing and reordering
           listBoardsForWorkspace: boardsService.listBoardsForWorkspace.bind(boardsService),
           createBoard: boardsService.createBoard.bind(boardsService),
           reorderBoards: boardsService.reorderBoards.bind(boardsService),
-
+          // Column management
           listColumns: boardsService.listColumns.bind(boardsService),
           createColumn: boardsService.createColumn.bind(boardsService),
           updateColumn: boardsService.updateColumn.bind(boardsService),
           deleteColumn: boardsService.deleteColumn.bind(boardsService),
           reorderColumns: boardsService.reorderColumns.bind(boardsService),
-
+          // Label management
           listLabels: boardsService.listLabels.bind(boardsService),
           createLabel: boardsService.createLabel.bind(boardsService),
           updateLabel: boardsService.updateLabel.bind(boardsService),
           deleteLabel: boardsService.deleteLabel.bind(boardsService),
           reorderLabels: boardsService.reorderLabels.bind(boardsService),
-
+          // Ticket querying and movement
           listTickets: boardsService.listTickets.bind(boardsService),
           listTicketsByColumn: boardsService.listTicketsByColumn.bind(boardsService),
           createTicket: boardsService.createTicket.bind(boardsService),
@@ -228,42 +290,49 @@ async function bootstrap() {
           archiveTicket: boardsService.archiveTicket.bind(boardsService),
         };
 
+        // Board backgrounds service wrapper
         const boardBackgrounds = {
           list: boardBackgroundsService.list.bind(boardBackgroundsService),
         };
 
+        /**
+         * Factory function to create ticket service wrapper with role-based authorization.
+         * @param actorId - The ID of the user performing actions (null for unauthenticated)
+         * @returns Ticket service wrapper with methods bound to the current actor
+         */
         const makeTickets = (actorId: string | null) => ({
+          // Ticket CRUD
           getById: ticketsService.getById.bind(ticketsService),
           update: ticketsService.update.bind(ticketsService),
           archive: ticketsService.archive.bind(ticketsService),
-
+          // Comments
           listComments: ticketsService.listComments.bind(ticketsService),
           addComment: ticketsService.addComment.bind(ticketsService),
           updateComment: ticketsService.updateComment.bind(ticketsService),
           deleteComment: ticketsService.deleteComment.bind(ticketsService),
-
+          // Assignees
           getAssigneeIds: ticketsService.getAssigneeIds.bind(ticketsService),
           addAssignee: ticketsService.addAssignee.bind(ticketsService),
           removeAssignee: ticketsService.removeAssignee.bind(ticketsService),
+          // Watch status for notifications
           getWatchStatus: ticketsService.getWatchStatus.bind(ticketsService),
           setWatchStatus: ticketsService.setWatchStatus.bind(ticketsService),
           listWatchUserIds: ticketsService.listWatchUserIds.bind(ticketsService),
-
+          // Labels
           getLabelIds: ticketsService.getLabelIds.bind(ticketsService),
           addLabel: ticketsService.addLabel.bind(ticketsService),
           removeLabel: ticketsService.removeLabel.bind(ticketsService),
-
+          // Checklists and items
           listChecklists: ticketsService.listChecklists.bind(ticketsService),
           createChecklist: ticketsService.createChecklist.bind(ticketsService),
           updateChecklist: ticketsService.updateChecklist.bind(ticketsService),
           deleteChecklist: ticketsService.deleteChecklist.bind(ticketsService),
           reorderChecklists: ticketsService.reorderChecklists.bind(ticketsService),
-
           addChecklistItem: ticketsService.addChecklistItem.bind(ticketsService),
           updateChecklistItem: ticketsService.updateChecklistItem.bind(ticketsService),
           deleteChecklistItem: ticketsService.deleteChecklistItem.bind(ticketsService),
           reorderChecklistItems: ticketsService.reorderChecklistItems.bind(ticketsService),
-
+          // Attachments with GCS signed URLs
           listAttachments: ticketsService.listAttachments.bind(ticketsService),
           createAttachmentUpload: async (
             ticketId: string,
@@ -306,6 +375,7 @@ async function bootstrap() {
           },
         });
 
+        // Notifications service wrapper
         const notifications = {
           create: notificationsService.create.bind(notificationsService),
           list: notificationsService.list.bind(notificationsService),
@@ -314,6 +384,7 @@ async function bootstrap() {
           markAllRead: notificationsService.markAllRead.bind(notificationsService),
         };
 
+        // Ticket reminders service wrapper
         const ticketReminders = {
           list: (ticketId: string, input: { userId: string }) => ticketRemindersService.listForUser(ticketId, input.userId),
           create: (ticketId: string, input: { userId: string; remindAt: string }) =>
@@ -322,12 +393,14 @@ async function bootstrap() {
             ticketRemindersService.removeForUser(ticketId, reminderId, input.userId),
         };
 
+        // Activity logs service wrapper
         const activityLogs = {
           create: activityLogsService.create.bind(activityLogsService),
           listForBoard: activityLogsService.listForBoard.bind(activityLogsService),
           listForTicket: activityLogsService.listForTicket.bind(activityLogsService),
         };
 
+        // If no token provided, return unauthenticated context
         if (!token) {
           return {
             user: null,
@@ -342,6 +415,7 @@ async function bootstrap() {
           };
         }
 
+        // Verify JWT token with Firebase and return authenticated context
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
@@ -362,6 +436,7 @@ async function bootstrap() {
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
+          // Return unauthenticated context on token verification failure
           return {
             user: null,
             users,
@@ -378,6 +453,7 @@ async function bootstrap() {
     }),
   );
 
+  // Start server on configured port (default 4000)
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
   // eslint-disable-next-line no-console

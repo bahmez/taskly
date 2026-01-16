@@ -1,3 +1,31 @@
+/**
+ * tRPC Router and Procedures
+ *
+ * Complete type-safe backend API definition using tRPC (TypeScript RPC).
+ * Defines all procedures (queries, mutations) accessible from frontend.
+ *
+ * Features:
+ * - End-to-end type safety (TypeScript types shared between frontend and backend)
+ * - Input validation with Zod schemas
+ * - Permission-based access control
+ * - Comprehensive error handling
+ * - Context with authenticated user and database services
+ *
+ * Procedure organization:
+ * - users: User profile queries and mutations
+ * - workspaces: Workspace management and member operations
+ * - boards: Board, column, and label management
+ * - tickets: Ticket CRUD, comments, attachments, reminders
+ * - notifications: User notifications
+ * - activityLogs: Activity tracking and history
+ *
+ * Usage on frontend:
+ * ```typescript
+ * const { data } = api.users.me.useQuery();
+ * await api.workspaces.create.useMutation({ title: 'My Workspace' });
+ * ```
+ */
+
 import superjson from 'superjson';
 import { initTRPC } from '@trpc/server';
 import { TRPCError } from '@trpc/server';
@@ -12,6 +40,13 @@ import {
   workspaceRolePermissions,
 } from '@taskly/shared';
 
+/**
+ * Extracts user IDs from legacy markdown mention format.
+ * Legacy format: @[Label](user:<userId>)
+ * 
+ * @param text - Text containing legacy mention links
+ * @returns Array of unique user IDs found
+ */
 function extractMentionUserIdsFromLegacyMarkdown(text: string): string[] {
   // Legacy mentions stored as markdown links: @[Label](user:<userId>)
   const ids: string[] = [];
