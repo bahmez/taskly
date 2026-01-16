@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { UsersStore } from './users.store';
 
@@ -34,10 +34,6 @@ describe('UsersStore', () => {
     });
   });
 });
-
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { Firestore } from 'firebase-admin/firestore';
-import { UsersStore } from './users.store';
 
 type UserDoc = { username: string; first_name: string; last_name: string; description: string; createdAt: string; updatedAt: string };
 type Doc = { id: string; data: () => UserDoc };

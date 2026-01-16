@@ -68,9 +68,11 @@ function mapGradient(value: string): BoardBackground {
   return { type: 'gradient', value };
 }
 
-function mapUnsplashPhoto(photo: Record<string, unknown>): BoardBackground | null {
-  const id = typeof photo.id === 'string' ? photo.id : '';
-  const urls = (photo.urls as Record<string, unknown> | undefined) ?? {};
+function mapUnsplashPhoto(photo: unknown): BoardBackground | null {
+  if (!photo || typeof photo !== 'object') return null;
+  const data = photo as Record<string, unknown>;
+  const id = typeof data.id === 'string' ? data.id : '';
+  const urls = (data.urls as Record<string, unknown> | undefined) ?? {};
   const url =
     (typeof urls.full === 'string' && urls.full) ||
     (typeof urls.regular === 'string' && urls.regular) ||
@@ -84,7 +86,7 @@ function mapUnsplashPhoto(photo: Record<string, unknown>): BoardBackground | nul
     '';
   if (!id || !url || !thumbUrl) return null;
 
-  const user = (photo.user as Record<string, unknown> | undefined) ?? {};
+  const user = (data.user as Record<string, unknown> | undefined) ?? {};
   const links = (user.links as Record<string, unknown> | undefined) ?? {};
 
   return {
@@ -94,8 +96,8 @@ function mapUnsplashPhoto(photo: Record<string, unknown>): BoardBackground | nul
       id,
       url,
       thumbUrl,
-      blurHash: typeof photo.blur_hash === 'string' ? photo.blur_hash : null,
-      color: typeof photo.color === 'string' ? photo.color : null,
+      blurHash: typeof data.blur_hash === 'string' ? data.blur_hash : null,
+      color: typeof data.color === 'string' ? data.color : null,
       authorName: typeof user.name === 'string' ? user.name : null,
       authorUrl: typeof links.html === 'string' ? links.html : null,
     },
@@ -144,7 +146,10 @@ export class BoardBackgroundsService {
       return { items, nextCursor: hasMore ? String(page + 1) : null };
     }
 
-    const res = await this.unsplash.photos.list({ page, perPage: limit, orderBy: 'popular' });
+    const res = await this.unsplash.photos.list({
+      page,
+      perPage: limit,
+    });
     if (res.type !== 'success') throw new Error('Unsplash list failed');
     const raw =
       Array.isArray(res.response) ? res.response : (res.response as { results?: unknown[] } | null)?.results ?? [];

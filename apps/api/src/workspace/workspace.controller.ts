@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser, FirebaseAuthGuard } from '@taskly/auth';
-import type { UserModel, WorkspaceRole } from '@taskly/database';
+import type { BoardBackground, UserModel, WorkspaceRole } from '@taskly/database';
 import { BoardsService, UsersService, WorkspacesService } from '@taskly/database';
 import { canAssignRole } from './permissions.js';
 import { WorkspaceAccessService } from './workspace-access.service.js';
@@ -24,8 +24,47 @@ type PatchWorkspaceDto = { title?: string; description?: string };
 type AddMemberDto = { userId?: string; role?: WorkspaceRole };
 type PatchMemberDto = { role?: WorkspaceRole };
 
-type CreateBoardDto = { title?: string; backgroundColor?: string | null };
+type CreateBoardDto = { title?: string; background?: BoardBackground | string | null; backgroundColor?: string | null };
 type ReorderBoardsDto = { boardIds?: string[] };
+
+function parseBoardBackgroundInput(input: unknown): BoardBackground | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === 'string') {
+    const value = input.trim();
+    if (!value) return null;
+    return { type: 'color', value };
+  }
+  if (typeof input !== 'object') return null;
+  const data = input as { type?: unknown; value?: unknown };
+  if (data.type === 'color' || data.type === 'gradient') {
+    if (typeof data.value !== 'string') return null;
+    const value = data.value.trim();
+    if (!value) return null;
+    return { type: data.type, value };
+  }
+  if (data.type === 'image') {
+    if (typeof data.value !== 'object' || !data.value) return null;
+    const value = data.value as Record<string, unknown>;
+    const id = typeof value.id === 'string' ? value.id : '';
+    const url = typeof value.url === 'string' ? value.url : '';
+    const thumbUrl = typeof value.thumbUrl === 'string' ? value.thumbUrl : '';
+    if (!id || !url || !thumbUrl) return null;
+    return {
+      type: 'image',
+      value: {
+        source: value.source === 'unsplash' ? 'unsplash' : 'unsplash',
+        id,
+        url,
+        thumbUrl,
+        blurHash: typeof value.blurHash === 'string' ? value.blurHash : null,
+        color: typeof value.color === 'string' ? value.color : null,
+        authorName: typeof value.authorName === 'string' ? value.authorName : null,
+        authorUrl: typeof value.authorUrl === 'string' ? value.authorUrl : null,
+      },
+    };
+  }
+  return null;
+}
 
 type CreateInvitationDto = { role?: WorkspaceRole; expiresInDays?: number };
 
@@ -232,11 +271,16 @@ export class WorkspaceController {
     await this.access.requirePermission(workspaceId, user.id, 'workspace.boards.write');
     const title = (body.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
-    const backgroundColor = body.backgroundColor ?? null;
+    const legacyColor = (body.backgroundColor ?? '').trim();
+    const background: BoardBackground | null = Object.prototype.hasOwnProperty.call(body, 'background')
+      ? parseBoardBackgroundInput(body.background)
+      : legacyColor
+        ? ({ type: 'color', value: legacyColor } satisfies BoardBackground)
+        : null;
     return await this.boardsService.createBoard({
       workspaceId,
       title,
-      background: backgroundColor,
+      background,
     });
   }
 

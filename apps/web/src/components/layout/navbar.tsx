@@ -28,6 +28,7 @@ import { useAuth } from "@/auth/auth-provider"
 import { getFirebaseAuth } from "@/lib/firebase/firebase-client"
 import { updateProfile } from "firebase/auth"
 import { UserAvatar } from "@/components/user/user-avatar"
+import { getBoardBackgroundStyle } from "@/components/board/board-background"
 
 
 function formatNotificationTime(input: { createdAt?: string; createdAtMs?: number }) {

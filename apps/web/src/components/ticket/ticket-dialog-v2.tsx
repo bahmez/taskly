@@ -44,7 +44,6 @@ import {
   type MentionableUser,
   parseMentionTokens,
   mentionMatchFromToken,
-  type MentionToken,
   findMentionTokenAtCursor,
 } from '../ui/mention-autocomplete';
 
@@ -62,13 +61,6 @@ function trpcErrorMessage(err: unknown): string {
   if (!err || typeof err !== 'object') return 'Action failed';
   const msg = (err as Record<string, unknown>).message;
   return typeof msg === 'string' && msg.trim() ? msg : 'Action failed';
-}
-
-function getUserInitials(name?: string): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0]![0] + parts[1]![0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
 }
 
 function LabelChip({ name, color, onRemove }: { name: string; color: string; onRemove?: () => void }) {
@@ -171,7 +163,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     { enabled: open && workspaceMemberIds.length > 0 }
   );
 
-  const ticketActivity = ticketActivityQuery.data?.items ?? [];
+  const ticketActivity = React.useMemo(() => ticketActivityQuery.data?.items ?? [], [ticketActivityQuery.data?.items]);
   const activityUserIds = React.useMemo(() => {
     const ids: string[] = [];
     for (const a of ticketActivity) {
@@ -428,15 +420,6 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     [usersById],
   );
 
-  const initialsForUser = React.useCallback(
-    (userId: string): string => {
-      const u = usersById.get(userId);
-      if (!u) return getUserInitials(userId);
-      const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
-      return getUserInitials(full || u.username || userId);
-    },
-    [usersById],
-  );
 
   // Mutations
   const updateTicket = api.tickets.update.useMutation({
@@ -690,7 +673,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const isDueValid = Number.isFinite(dueMs);
   const isOverdue = isDueValid ? dueMs < Date.now() : false;
 
-  const boardLabels = boardLabelsQuery.data ?? [];
+  const boardLabels = React.useMemo(() => boardLabelsQuery.data ?? [], [boardLabelsQuery.data]);
   const ticketLabelIds = labelsQuery.data?.labelIds ?? [];
   const labelById = React.useMemo(() => new Map(boardLabels.map((l) => [l.id, l])), [boardLabels]);
 

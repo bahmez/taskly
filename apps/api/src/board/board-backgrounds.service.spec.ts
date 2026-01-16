@@ -66,7 +66,7 @@ describe('BoardBackgroundsService', () => {
     const service = new BoardBackgroundsService();
     const res = await service.list({ type: 'image', limit: 1 });
 
-    expect(list).toHaveBeenCalledWith({ page: 1, perPage: 1, orderBy: 'popular' });
+    expect(list).toHaveBeenCalledWith({ page: 1, perPage: 1 });
     expect(res.items).toHaveLength(1);
     expect(res.items[0]).toMatchObject({
       type: 'image',

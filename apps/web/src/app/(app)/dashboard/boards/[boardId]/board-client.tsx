@@ -169,9 +169,9 @@ function SortableBoardTicket({
   t,
   labelMap,
   onOpen,
-  formatUserPrimary,
-  formatUserSecondary,
-  initialsForUser,
+  formatUserPrimary: _formatUserPrimary,
+  formatUserSecondary: _formatUserSecondary,
+  initialsForUser: _initialsForUser,
   userById,
 }: {
   t: TicketLike;
@@ -308,7 +308,7 @@ function SortableBoardTicket({
 }
 
 function SortableBoardColumn({
-  boardId,
+  boardId: _boardId,
   col,
   colTickets,
   isEditingThisColumn,
@@ -628,7 +628,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
   const canEditBackground = viewQuery.data?.permissions?.canBackgroundWrite ?? false;
   const serverColumns = React.useMemo(() => viewQuery.data?.columns ?? [], [viewQuery.data?.columns]);
   const serverTickets = React.useMemo(() => viewQuery.data?.tickets ?? [], [viewQuery.data?.tickets]);
-  const boardLabels = labelsQuery.data ?? [];
+  const boardLabels = React.useMemo(() => labelsQuery.data ?? [], [labelsQuery.data]);
 
   const [columnsState, setColumnsState] = React.useState(serverColumns);
   const [ticketsState, setTicketsState] = React.useState(serverTickets);
@@ -652,7 +652,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     return new Map((assigneeUsersQuery.data ?? []).map((u) => [u.id, u]));
   }, [assigneeUsersQuery.data]);
 
-  const boardActivityItems = boardActivityQuery.data?.items ?? [];
+  const boardActivityItems = React.useMemo(() => boardActivityQuery.data?.items ?? [], [boardActivityQuery.data?.items]);
   const activityActorIds = React.useMemo(() => {
     const ids = boardActivityItems.map((i) => i.actorId).filter(Boolean) as string[];
     return Array.from(new Set(ids));
