@@ -15,7 +15,15 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  GithubAuthProvider,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase/firebase-client';
 
 /**
@@ -29,6 +37,10 @@ type AuthContextValue = {
   loading: boolean;
   /** Sign in with email and password */
   signInWithEmailPassword: (email: string, password: string) => Promise<void>;
+  /** Sign in with Google */
+  signInWithGoogle: () => Promise<void>;
+  /** Sign in with GitHub */
+  signInWithGithub: () => Promise<void>;
   /** Register new user with email and password */
   registerWithEmailPassword: (email: string, password: string) => Promise<void>;
   /** Sign out current user */
@@ -94,6 +106,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const auth = getFirebaseAuth();
         if (!auth) throw new Error("Firebase Auth n'est pas configuré (env manquantes).");
         await signInWithEmailAndPassword(auth, email, password);
+      },
+      /**
+       * Sign in with Google via popup.
+       * @throws Error if Firebase Auth is not configured
+       */
+      signInWithGoogle: async () => {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error("Firebase Auth n'est pas configuré (env manquantes).");
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      },
+      /**
+       * Sign in with GitHub via popup.
+       * @throws Error if Firebase Auth is not configured
+       */
+      signInWithGithub: async () => {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error("Firebase Auth n'est pas configuré (env manquantes).");
+        const provider = new GithubAuthProvider();
+        await signInWithPopup(auth, provider);
       },
       /**
        * Register new user with email and password.
