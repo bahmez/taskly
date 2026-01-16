@@ -15,7 +15,7 @@ Une navigation complète de toute la documentation technique de Taskly.
 
 ---
 
-## 📖 Documentation Principale (5 documents)
+## 📖 Documentation Principale (6 documents)
 
 ### **1️⃣ [01_ARCHITECTURE_GLOBALE.md](./01_ARCHITECTURE_GLOBALE.md)**
 **Durée de lecture** : 15-20 minutes
@@ -181,6 +181,44 @@ Opérations complexes:
 ```
 Collaboration = Multiple users + Real-time updates
 Firestore listeners = Auto-sync UI quand data change
+```
+
+---
+
+### **6️⃣ [06_FUTURES_TACHES.md](./06_FUTURES_TACHES.md)**
+**Durée de lecture** : 20-25 minutes
+
+#### Contenu
+- 🚀 Roadmap Phase 2 (post-MVP)
+- 📊 Avance par rapport au cahier des charges
+- 🎟️ **T-104** : Authentification Multi-Provider
+  - Connexion Google et GitHub
+  - Gestion des providers
+  - Fusion de comptes
+- 🎟️ **T-105** : Internationalisation (FR/EN)
+  - Support multi-langue
+  - Traductions complètes
+  - Sélecteur de langue
+- 🎟️ **T-106** : Recherche de Boards/Workspaces
+  - Barre de recherche globale (Cmd+K)
+  - Recherche instantanée
+  - Optimisations Firestore
+- 📊 Estimation temps, complexité
+- 📅 Chronologie et allocation d'équipe
+
+#### Pour Qui
+- Tech leads (planification)
+- Frontend developers
+- Backend developers
+- Product managers
+
+#### Points Clés
+```
+Phase 2 Roadmap
+T-104 (Auth) : 8-13 pts, 2-3j
+T-105 (i18n) : 13-21 pts, 4-5j
+T-106 (Search) : 8-13 pts, 2-3j
+Total: 29-47 pts, 8-11 jours
 ```
 
 ---

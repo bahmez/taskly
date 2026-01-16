@@ -93,6 +93,22 @@ Taskly permet à des équipes de collaborer sur des tableaux kanban avec :
 
 ---
 
+### 6. [Futures Tâches - Roadmap Phase 2](./06_FUTURES_TACHES.md)
+**Pour comprendre** les améliorations planifiées post-MVP.
+
+- **Contenu** :
+  - Context et avance par rapport au cahier des charges
+  - **T-104** : Authentification Multi-Provider (Google & GitHub)
+  - **T-105** : Internationalisation (Français & Anglais)
+  - **T-106** : Recherche de Boards et Workspaces
+  - Estimation de temps et complexité
+  - Chronologie et allocation d'équipe
+  - Critères de succès
+
+**À lire si** : Vous contribuez aux améliorations futures ou voulez comprendre la roadmap du projet.
+
+---
+
 ## 🗂️ Organiser ta Lecture
 
 ### Pour les Nouveaux Contributeurs
