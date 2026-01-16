@@ -17,6 +17,7 @@ import {
   Textarea,
 } from '@taskly/ui';
 import { api } from '@/app/trpc';
+import { getBoardBackgroundStyle } from '@/components/board/board-background';
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -51,9 +52,12 @@ function WorkspaceBoardsSection({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {pageBoards.map((b) => (
               <Link key={b.id} href={`/dashboard/boards/${b.id}`} className="group">
-                <div className="h-24 rounded-lg border border-[#9fadbc29] bg-[#1d2125] hover:bg-[#22272b] transition-colors p-4 flex flex-col justify-between">
-                  <div className="text-sm font-semibold text-[#b6c2cf] group-hover:text-white truncate">{b.title}</div>
-                  <div className="text-xs text-[#9fadbc]">Ouvrir →</div>
+                <div className="h-24 rounded-lg border border-[#9fadbc29] bg-[#1d2125] hover:bg-[#22272b] transition-colors overflow-hidden flex flex-col">
+                  <div className="h-8" style={getBoardBackgroundStyle(b.background, { preferThumb: true })} />
+                  <div className="flex-1 p-3 flex flex-col justify-between">
+                    <div className="text-sm font-semibold text-[#b6c2cf] group-hover:text-white truncate">{b.title}</div>
+                    <div className="text-xs text-[#9fadbc]">Ouvrir →</div>
+                  </div>
                 </div>
               </Link>
             ))}

@@ -157,6 +157,32 @@ describe('BoardsStore', () => {
       ['b2', 1],
     ]);
   });
+
+  it('getBoardById normalizes legacy string background', async () => {
+    const boardSnap = {
+      exists: true,
+      id: 'b1',
+      data: () => ({
+        workspaceId: 'w1',
+        title: 'Board',
+        description: '',
+        background: '#0EA5E9',
+        order: 1,
+        isArchived: false,
+        archivedAt: null,
+        createdAt: 'now',
+        updatedAt: 'now',
+      }),
+    };
+
+    const boardRef = { get: async () => boardSnap };
+    const boardsCol = { doc: (_id: string) => boardRef };
+    const db = { collection: (_name: string) => boardsCol };
+    const store = new BoardsStore(db as unknown as Firestore);
+
+    const board = await store.getBoardById('b1');
+    expect(board?.background).toEqual({ type: 'color', value: '#0EA5E9' });
+  });
 });
 
 

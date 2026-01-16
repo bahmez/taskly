@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FIRESTORE } from '@taskly/firebase';
 import type {
+  BoardBackground,
   BoardColumnCreateInput,
   BoardColumnModel,
   BoardColumnUpdateInput,
@@ -22,6 +23,62 @@ type LabelDoc = Omit<BoardLabelModel, 'id' | 'boardId'>;
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function parseBoardBackground(raw: unknown): BoardBackground | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'string') {
+    const value = raw.trim();
+    if (!value) return null;
+    return { type: 'color', value };
+  }
+  if (typeof raw !== 'object') return null;
+
+  const data = raw as { type?: unknown; value?: unknown };
+  if (data.type === 'color' || data.type === 'gradient') {
+    if (typeof data.value !== 'string') return null;
+    const value = data.value.trim();
+    if (!value) return null;
+    return { type: data.type, value };
+  }
+  if (data.type === 'image') {
+    const value = data.value as Record<string, unknown> | undefined;
+    if (!value || typeof value !== 'object') return null;
+    const id = typeof value.id === 'string' ? value.id : '';
+    const url = typeof value.url === 'string' ? value.url : '';
+    const thumbUrl = typeof value.thumbUrl === 'string' ? value.thumbUrl : '';
+    if (!id || !url || !thumbUrl) return null;
+    return {
+      type: 'image',
+      value: {
+        source: value.source === 'unsplash' ? 'unsplash' : 'unsplash',
+        id,
+        url,
+        thumbUrl,
+        blurHash: typeof value.blurHash === 'string' ? value.blurHash : null,
+        color: typeof value.color === 'string' ? value.color : null,
+        authorName: typeof value.authorName === 'string' ? value.authorName : null,
+        authorUrl: typeof value.authorUrl === 'string' ? value.authorUrl : null,
+      },
+    };
+  }
+
+  return null;
+}
+
+function toBoardModel(id: string, data: Partial<BoardDoc>): BoardModel {
+  return {
+    id,
+    workspaceId: String(data.workspaceId ?? ''),
+    title: String(data.title ?? ''),
+    description: String(data.description ?? ''),
+    background: parseBoardBackground(data.background),
+    order: Number.isFinite(data.order) ? (data.order as number) : 0,
+    isArchived: Boolean(data.isArchived ?? false),
+    archivedAt: (data.archivedAt as string | null | undefined) ?? null,
+    createdAt: String(data.createdAt ?? ''),
+    updatedAt: String(data.updatedAt ?? ''),
+  };
 }
 
 const DEFAULT_COLUMNS: Array<{ title: string; key: string; position: number }> = [
@@ -129,14 +186,14 @@ export class BoardsStore {
     }
     await batch.commit();
 
-    return { id: ref.id, ...doc };
+    return toBoardModel(ref.id, doc);
   }
 
   async getBoardById(boardId: string): Promise<BoardModel | null> {
     const snap = await this.boardRef(boardId).get();
     if (!snap.exists) return null;
-    const data = snap.data() as BoardDoc;
-    return { id: snap.id, ...data };
+    const data = snap.data() as Partial<BoardDoc>;
+    return toBoardModel(snap.id, data);
   }
 
   async updateBoard(boardId: string, patch: BoardUpdateInput): Promise<BoardModel> {
@@ -144,8 +201,8 @@ export class BoardsStore {
     const now = nowIso();
     await ref.update({ ...patch, updatedAt: now });
     const snap = await ref.get();
-    const data = snap.data() as BoardDoc;
-    return { id: snap.id, ...data };
+    const data = snap.data() as Partial<BoardDoc>;
+    return toBoardModel(snap.id, data);
   }
 
   async archiveBoard(boardId: string): Promise<void> {
@@ -159,7 +216,7 @@ export class BoardsStore {
       .where('isArchived', '==', false)
       .orderBy('order', 'asc')
       .get();
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as BoardDoc) }));
+    return snap.docs.map((d) => toBoardModel(d.id, d.data() as Partial<BoardDoc>));
   }
 
   async reorderBoards(workspaceId: string, boardIds: string[]): Promise<void> {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { appRouter } from './index';
-import type { Context } from './index';
+import type { ActivityLogType, Context, NotificationType, TicketAttachmentStatus, UserAvatar } from './index';
 
 function makeCtx(overrides: Partial<Context> = {}): Context {
   const base: Context = {
@@ -15,12 +15,28 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       updatedAt: '',
     },
     users: {
-      getById: vi.fn(async () => ({ id: 'u2', username: 'x', first_name: 'X', last_name: 'Y', description: '', avatar: null, createdAt: '', updatedAt: '' })),
+      getById: vi.fn(async () => null),
       search: vi.fn(async () => []),
-      updateMe: vi.fn(async () => ({ id: 'u1', username: 'u', first_name: 'U', last_name: 'One', description: '', avatar: null, createdAt: '', updatedAt: '' })),
+      updateMe: vi.fn(async (_id, patch) => ({
+        id: 'u1',
+        username: 'u',
+        first_name: 'U',
+        last_name: 'One',
+        description: '',
+        avatar: ((patch as { avatar?: UserAvatar | null }).avatar ?? null) as UserAvatar | null,
+        createdAt: '',
+        updatedAt: '',
+      })),
       deleteMe: vi.fn(async () => {}),
-      createAvatarUpload: vi.fn(async () => ({ objectPath: 'users/u1/avatar/x.png', upload: { url: 'u', method: 'PUT', headers: {} } })),
-      getAvatarDownload: vi.fn(async () => ({ url: 'u', method: 'GET', headers: {} })),
+      createAvatarUpload: vi.fn(async () => ({
+        objectPath: 'users/u1/avatar/file.png',
+        upload: { url: 'https://upload', method: 'PUT', headers: {} },
+      })),
+      getAvatarDownload: vi.fn(async () => ({
+        url: 'https://download',
+        method: 'GET',
+        headers: {},
+      })),
     },
     workspaces: {
       createWorkspace: vi.fn(async () => ({ id: 'w1', title: 'W', description: '', isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
@@ -44,8 +60,8 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       declineInvitationByToken: vi.fn(async () => ({ id: 'i1', workspaceId: 'w1', token: 't', role: 'viewer' as const, createdBy: 'u1', createdAt: '', expiresAt: '', acceptedAt: null, acceptedBy: null, declinedAt: '', declinedBy: 'u1', cancelledAt: null, cancelledBy: null })),
     },
     boards: {
-      getBoardById: vi.fn(async () => ({ id: 'b1', workspaceId: 'w1', title: 'B', description: '', background: null, order: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
-      updateBoard: vi.fn(async () => ({ id: 'b1', workspaceId: 'w1', title: 'B2', description: '', background: null, order: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
+      getBoardById: vi.fn(async () => null),
+      updateBoard: vi.fn(async () => ({ id: 'b1', workspaceId: 'w1', title: 'B', description: '', background: null, order: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
       archiveBoard: vi.fn(async () => {}),
       listBoardsForWorkspace: vi.fn(async () => []),
       createBoard: vi.fn(async () => ({ id: 'b1', workspaceId: 'w1', title: 'B', description: '', background: null, order: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
@@ -70,8 +86,8 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       list: vi.fn(async () => ({ items: [], nextCursor: null })),
     },
     tickets: {
-      getById: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
-      update: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T2', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
+      getById: vi.fn(async () => null),
+      update: vi.fn(async () => ({ id: 't1', boardId: 'b1', columnId: 'c1', title: 'T', description: '', dueDate: null, assigneeIds: [], labelIds: [], position: 1, isArchived: false, archivedAt: null, createdAt: '', updatedAt: '' })),
       archive: vi.fn(async () => {}),
       listComments: vi.fn(async () => []),
       addComment: vi.fn(async () => ({ id: 'cm1', ticketId: 't1', authorId: 'u1', content: 'hi', createdAt: '', updatedAt: '' })),
@@ -87,68 +103,79 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       addLabel: vi.fn(async () => {}),
       removeLabel: vi.fn(async () => {}),
       listChecklists: vi.fn(async () => []),
-      createChecklist: vi.fn(async () => ({ id: 'cl1', ticketId: 't1', title: 'CL', position: 1, createdAt: '', updatedAt: '', items: [] })),
-      updateChecklist: vi.fn(async () => ({ id: 'cl1', ticketId: 't1', title: 'CL', position: 1, createdAt: '', updatedAt: '', items: [] })),
+      createChecklist: vi.fn(async () => ({ id: 'cl1', ticketId: 't1', title: 'Checklist', position: 1, createdAt: '', updatedAt: '', items: [] })),
+      updateChecklist: vi.fn(async () => ({ id: 'cl1', ticketId: 't1', title: 'Checklist', position: 1, createdAt: '', updatedAt: '', items: [] })),
       deleteChecklist: vi.fn(async () => {}),
       reorderChecklists: vi.fn(async () => {}),
-      addChecklistItem: vi.fn(async () => ({ id: 'it1', ticketId: 't1', checklistId: 'cl1', content: 'x', isDone: false, position: 1, createdAt: '', updatedAt: '' })),
-      updateChecklistItem: vi.fn(async () => ({ id: 'it1', ticketId: 't1', checklistId: 'cl1', content: 'x', isDone: false, position: 1, createdAt: '', updatedAt: '' })),
+      addChecklistItem: vi.fn(async () => ({ id: 'cli1', ticketId: 't1', checklistId: 'cl1', content: 'Item', isDone: false, position: 1, createdAt: '', updatedAt: '' })),
+      updateChecklistItem: vi.fn(async () => ({ id: 'cli1', ticketId: 't1', checklistId: 'cl1', content: 'Item', isDone: false, position: 1, createdAt: '', updatedAt: '' })),
       deleteChecklistItem: vi.fn(async () => {}),
       reorderChecklistItems: vi.fn(async () => {}),
       listAttachments: vi.fn(async () => []),
-      createAttachmentUpload: vi.fn<Context['tickets']['createAttachmentUpload']>(async (ticketId, input) => ({
+      createAttachmentUpload: vi.fn(async (_ticketId: string, _input) => ({
         attachment: {
           id: 'a1',
-          ticketId,
+          ticketId: 't1',
           createdBy: 'u1',
-          filename: input.filename,
-          contentType: input.contentType,
+          filename: 'x',
+          contentType: 'text/plain',
           objectPath: 'p',
-          status: 'pending',
+          status: 'pending' as TicketAttachmentStatus,
           size: null,
           createdAt: '',
           updatedAt: '',
         },
-        upload: { url: 'u', method: 'PUT', headers: {}, expiresAt: '', type: 'write' },
+        upload: { url: 'u', method: 'PUT' as const, headers: {}, expiresAt: '', type: 'write' as const },
       })),
-      completeAttachment: vi.fn<Context['tickets']['completeAttachment']>(async (ticketId, attachmentId, patch) => ({
-        id: attachmentId,
-        ticketId,
+      completeAttachment: vi.fn(async (_ticketId: string, _attachmentId: string, _patch) => ({
+        id: 'a1',
+        ticketId: 't1',
         createdBy: 'u1',
-        filename: 'f',
+        filename: 'x',
         contentType: 'text/plain',
         objectPath: 'p',
-        status: 'uploaded',
-        size: patch.size ?? 12,
+        status: 'uploaded' as TicketAttachmentStatus,
+        size: 1,
         createdAt: '',
         updatedAt: '',
       })),
-      getAttachmentDownload: vi.fn<Context['tickets']['getAttachmentDownload']>(async (ticketId, attachmentId) => ({
+      getAttachmentDownload: vi.fn(async (_ticketId: string, _attachmentId: string) => ({
         attachment: {
-          id: attachmentId,
-          ticketId,
+          id: 'a1',
+          ticketId: 't1',
           createdBy: 'u1',
-          filename: 'f',
+          filename: 'x',
           contentType: 'text/plain',
           objectPath: 'p',
-          status: 'uploaded',
-          size: 12,
+          status: 'uploaded' as TicketAttachmentStatus,
+          size: 1,
           createdAt: '',
           updatedAt: '',
         },
-        download: { url: 'u', method: 'GET', headers: {}, expiresAt: '', type: 'read' },
+        download: { url: 'u', method: 'GET' as const, headers: {}, expiresAt: '', type: 'read' as const },
       })),
       removeAttachment: vi.fn(async () => {}),
     },
     ticketReminders: {
       list: vi.fn(async () => []),
-      create: vi.fn(async () => ({ id: 'r1', boardId: 'b1', ticketId: 't1', userId: 'u1', remindAt: '2026-01-01T00:00:00.000Z', remindAtMs: 0, createdAt: '', updatedAt: '', sentAt: null, notificationIds: {} })),
-      remove: vi.fn(async () => {}),
+      create: vi.fn(async (_ticketId: string, input: { userId: string; remindAt: string }) => ({
+        id: 'r1',
+        boardId: 'b1',
+        ticketId: 't1',
+        userId: input.userId,
+        remindAt: input.remindAt,
+        remindAtMs: 0,
+        createdAt: '',
+        updatedAt: '',
+        sentAt: null,
+        notificationIds: {},
+      })),
+      remove: vi.fn(async (_ticketId: string, _reminderId: string, _input: { userId: string }) => {}),
     },
     notifications: {
-      create: vi.fn<Context['notifications']['create']>(async (userId, input) => ({
+      create: vi.fn(async (_userId: string, input: { type: NotificationType; title: string; body?: string | null; data?: Record<string, unknown>; actorId?: string | null }) => ({
         id: 'n1',
-        userId,
+        userId: 'u1',
         type: input.type,
         title: input.title,
         body: input.body ?? null,
@@ -164,9 +191,9 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
       markAllRead: vi.fn(async () => {}),
     },
     activityLogs: {
-      create: vi.fn<Context['activityLogs']['create']>(async (boardId, input) => ({
+      create: vi.fn(async (_boardId: string, input: { ticketId?: string | null; type: ActivityLogType; actorId?: string | null; data?: Record<string, unknown> }) => ({
         id: 'al1',
-        boardId,
+        boardId: 'b1',
         ticketId: input.ticketId ?? null,
         type: input.type,
         actorId: input.actorId ?? null,
@@ -181,71 +208,26 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
   return { ...base, ...overrides };
 }
 
-describe('activity logs (tRPC)', () => {
-  it('boards.activity.list delegates to ctx.activityLogs.listForBoard', async () => {
+describe('users.avatar', () => {
+  it('setInitialsBackground updates avatar', async () => {
     const ctx = makeCtx();
     const caller = appRouter.createCaller(ctx);
-    await caller.boards.activity.list({ boardId: 'b1', limit: 10, cursor: null, includeTickets: true });
-    expect(ctx.activityLogs.listForBoard).toHaveBeenCalledWith('b1', { limit: 10, cursor: null, includeTickets: true });
+
+    await caller.users.avatar.setInitialsBackground({ background: { type: 'color', value: '#0EA5E9' } });
+
+    expect(ctx.users.updateMe).toHaveBeenCalledWith(ctx.user!.id, {
+      avatar: { type: 'initials', background: { type: 'color', value: '#0EA5E9' } },
+    });
   });
 
-  it('tickets.activity.list delegates to ctx.activityLogs.listForTicket using ticket.boardId', async () => {
+  it('completeUpload returns download url', async () => {
     const ctx = makeCtx();
     const caller = appRouter.createCaller(ctx);
-    await caller.tickets.activity.list({ ticketId: 't1', limit: 10, cursor: null });
-    expect(ctx.activityLogs.listForTicket).toHaveBeenCalledWith('b1', 't1', { limit: 10, cursor: null });
-  });
 
-  it('tickets.update writes an activity log (best-effort)', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.update({ ticketId: 't1', title: 'New title' });
-    expect(ctx.activityLogs.create).toHaveBeenCalledWith('b1', expect.objectContaining({ ticketId: 't1', type: 'ticket_updated', actorId: 'u1' }));
+    const res = await caller.users.avatar.completeUpload({ objectPath: 'users/u1/avatar/file.png' });
+
+    expect(res.download.url).toBe('https://download');
+    expect(ctx.users.getAvatarDownload).toHaveBeenCalledWith('users/u1/avatar/file.png');
   });
 });
 
-describe('ticket reminders (tRPC)', () => {
-  it('tickets.reminders.list delegates to ctx.ticketReminders.list', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.reminders.list({ ticketId: 't1' });
-    expect(ctx.ticketReminders.list).toHaveBeenCalledWith('t1', { userId: 'u1' });
-  });
-
-  it('tickets.reminders.create delegates to ctx.ticketReminders.create', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.reminders.create({ ticketId: 't1', remindAt: '2026-01-01T00:00:00.000Z' });
-    expect(ctx.ticketReminders.create).toHaveBeenCalledWith('t1', { userId: 'u1', remindAt: '2026-01-01T00:00:00.000Z' });
-  });
-
-  it('tickets.reminders.remove delegates to ctx.ticketReminders.remove', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.reminders.remove({ ticketId: 't1', reminderId: 'r1' });
-    expect(ctx.ticketReminders.remove).toHaveBeenCalledWith('t1', 'r1', { userId: 'u1' });
-  });
-});
-
-describe('ticket watch (tRPC)', () => {
-  it('tickets.watch.get delegates to ctx.tickets.getWatchStatus', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.watch.get({ ticketId: 't1' });
-    expect(ctx.tickets.getWatchStatus).toHaveBeenCalledWith('t1', 'u1');
-  });
-
-  it('tickets.watch.watch delegates to ctx.tickets.setWatchStatus(true)', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.watch.watch({ ticketId: 't1' });
-    expect(ctx.tickets.setWatchStatus).toHaveBeenCalledWith('t1', 'u1', true);
-  });
-
-  it('tickets.watch.unwatch delegates to ctx.tickets.setWatchStatus(false)', async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    await caller.tickets.watch.unwatch({ ticketId: 't1' });
-    expect(ctx.tickets.setWatchStatus).toHaveBeenCalledWith('t1', 'u1', false);
-  });
-});

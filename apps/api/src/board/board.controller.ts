@@ -11,11 +11,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser, FirebaseAuthGuard } from '@taskly/auth';
-import type { UserModel } from '@taskly/database';
+import type { BoardBackground, UserModel } from '@taskly/database';
 import { BoardsService } from '@taskly/database';
 import { BoardAccessService } from './board-access.service.js';
 
-type PatchBoardDto = { title?: string; description?: string; background?: string | null };
+type PatchBoardDto = { title?: string; description?: string; background?: BoardBackground | string | null };
 type CreateColumnDto = { title?: string; key?: string };
 type PatchColumnDto = { title?: string; key?: string };
 type ReorderColumnsDto = { columnIds?: string[] };
@@ -23,6 +23,45 @@ type MoveTicketDto = { columnId?: string; position?: number };
 type CreateLabelDto = { name?: string; color?: string | null };
 type PatchLabelDto = { name?: string; color?: string | null };
 type ReorderLabelsDto = { labelIds?: string[] };
+
+function parseBoardBackgroundInput(input: unknown): BoardBackground | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === 'string') {
+    const value = input.trim();
+    if (!value) return null;
+    return { type: 'color', value };
+  }
+  if (typeof input !== 'object') return null;
+  const data = input as { type?: unknown; value?: unknown };
+  if (data.type === 'color' || data.type === 'gradient') {
+    if (typeof data.value !== 'string') return null;
+    const value = data.value.trim();
+    if (!value) return null;
+    return { type: data.type, value };
+  }
+  if (data.type === 'image') {
+    if (typeof data.value !== 'object' || !data.value) return null;
+    const value = data.value as Record<string, unknown>;
+    const id = typeof value.id === 'string' ? value.id : '';
+    const url = typeof value.url === 'string' ? value.url : '';
+    const thumbUrl = typeof value.thumbUrl === 'string' ? value.thumbUrl : '';
+    if (!id || !url || !thumbUrl) return null;
+    return {
+      type: 'image',
+      value: {
+        source: value.source === 'unsplash' ? 'unsplash' : 'unsplash',
+        id,
+        url,
+        thumbUrl,
+        blurHash: typeof value.blurHash === 'string' ? value.blurHash : null,
+        color: typeof value.color === 'string' ? value.color : null,
+        authorName: typeof value.authorName === 'string' ? value.authorName : null,
+        authorUrl: typeof value.authorUrl === 'string' ? value.authorUrl : null,
+      },
+    };
+  }
+  return null;
+}
 
 @UseGuards(FirebaseAuthGuard)
 @Controller('/api/boards')
@@ -72,14 +111,22 @@ export class BoardController {
     const role = await this.access.getWorkspaceRoleOrThrow(user.id, board.workspaceId);
     this.access.requirePermission(role, 'board.meta.write');
 
-    const patch: { title?: string; description?: string; background?: string | null } = {};
+    const patch: { title?: string; description?: string; background?: BoardBackground | null } = {};
     if (typeof body.title === 'string') {
       const t = body.title.trim();
       if (!t) throw new BadRequestException('title cannot be empty');
       patch.title = t;
     }
     if (typeof body.description === 'string') patch.description = body.description.trim();
-    if (body.background === null || typeof body.background === 'string') patch.background = body.background;
+    if (Object.prototype.hasOwnProperty.call(body, 'background')) {
+      if (body.background === null) {
+        patch.background = null;
+      } else {
+        const parsed = parseBoardBackgroundInput(body.background);
+        if (!parsed) throw new BadRequestException('background is invalid');
+        patch.background = parsed;
+      }
+    }
 
     return await this.boards.updateBoard(boardId, patch);
   }

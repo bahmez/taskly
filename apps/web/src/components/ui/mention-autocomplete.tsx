@@ -1,24 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Avatar, AvatarFallback, cn } from '@taskly/ui';
+import { cn } from '@taskly/ui';
+import type { UserAvatar } from '@taskly/trpc';
+import { UserAvatar as UserAvatarView } from '@/components/user/user-avatar';
 
 export type MentionableUser = {
   id: string;
   username: string;
   first_name?: string | null;
   last_name?: string | null;
+  avatar?: UserAvatar | null;
 };
-
-function initialsFor(u: MentionableUser): string {
-  const first = (u.first_name ?? '').trim();
-  const last = (u.last_name ?? '').trim();
-  const fromNames = `${first[0] ?? ''}${last[0] ?? ''}`.trim();
-  if (fromNames) return fromNames.toUpperCase();
-  const uname = (u.username ?? '').trim();
-  if (uname) return uname.slice(0, 2).toUpperCase();
-  return '?';
-}
 
 function displayFor(u: MentionableUser): string {
   const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
@@ -148,9 +141,7 @@ export function MentionDropdown({
               isActive ? 'bg-[#0c66e4] bg-opacity-20' : 'hover:bg-[#2c3136]',
             )}
           >
-            <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback className="bg-[#44546f] text-white text-xs">{initialsFor(u)}</AvatarFallback>
-            </Avatar>
+            <UserAvatarView user={u} className="h-9 w-9 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="font-medium truncate">{displayFor(u)}</div>
               <div className="text-xs text-[#9fadbc] truncate">@{u.username}</div>

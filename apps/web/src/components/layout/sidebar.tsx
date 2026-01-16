@@ -48,13 +48,16 @@ export function Sidebar({ className, isCollapsed: controlledCollapsed, onCollaps
   const [newBoardTitle, setNewBoardTitle] = React.useState("")
 
   return (
-    <div className={cn(
-      "relative flex flex-col border-r border-[#9fadbc29] bg-[#1d2125] bg-opacity-90 backdrop-blur-xl text-[#9fadbc] transition-all duration-300", 
-      isCollapsed ? "w-12" : "w-64",
-      className
-    )} {...props}>
+    <div
+      className={cn(
+        "relative z-100 flex flex-col border-r border-[#9fadbc29] bg-[#1d2125] bg-opacity-90 backdrop-blur-xl text-[#9fadbc] transition-all duration-300",
+        isCollapsed ? "w-12" : "w-64",
+        className,
+      )}
+      {...props}
+    >
       {/* Collapse Toggle */}
-      <div className="absolute -right-3 top-3 z-10">
+      <div className="absolute -right-3 top-3 z-100">
          <Button 
           variant="outline" 
           size="icon" 

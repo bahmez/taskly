@@ -19,6 +19,7 @@ import {
 } from '@taskly/database';
 import type { AppRouter, Context } from '@taskly/trpc';
 import { GcsService } from './gcs/gcs.service.js';
+import { BoardBackgroundsService } from './board/board-backgrounds.service.js';
 import crypto from 'node:crypto';
 
 function extractBearerToken(header: string | undefined): string | null {
@@ -37,6 +38,12 @@ function buildObjectPath(boardId: string, ticketId: string, filename: string): s
   const safe = sanitizeFilename(filename);
   const rand = crypto.randomBytes(8).toString('hex');
   return `boards/${boardId}/tickets/${ticketId}/${rand}-${safe}`;
+}
+
+function buildUserAvatarPath(userId: string, filename: string): string {
+  const safe = sanitizeFilename(filename);
+  const rand = crypto.randomBytes(8).toString('hex');
+  return `users/${userId}/avatar/${rand}-${safe}`;
 }
 
 async function bootstrap() {
@@ -77,6 +84,7 @@ async function bootstrap() {
   const usersService = app.get(UsersService);
   const workspacesService = app.get(WorkspacesService);
   const boardsService = app.get(BoardsService);
+  const boardBackgroundsService = app.get(BoardBackgroundsService);
   const ticketsService = app.get(TicketsService);
   const ticketRemindersService = app.get(TicketRemindersService);
   const notificationsService = app.get(NotificationsService);
@@ -133,6 +141,20 @@ async function bootstrap() {
           search: usersService.search.bind(usersService),
           updateMe: usersService.updateMe.bind(usersService),
           deleteMe: usersService.deleteMe.bind(usersService),
+          createAvatarUpload: async (userId: string, input: { filename: string; contentType: string; resumable?: boolean }) => {
+            const filename = sanitizeFilename(input.filename);
+            const contentType = input.contentType.trim() || 'application/octet-stream';
+            const objectPath = buildUserAvatarPath(userId, filename);
+            const upload = await gcsService.signedUploadUrl({
+              objectPath,
+              contentType,
+              resumable: input.resumable ?? false,
+            });
+            return { objectPath, upload };
+          },
+          getAvatarDownload: async (objectPath: string) => {
+            return await gcsService.signedDownloadUrl({ objectPath });
+          },
         };
 
         const workspaces = {
@@ -185,6 +207,10 @@ async function bootstrap() {
           createTicket: boardsService.createTicket.bind(boardsService),
           moveTicket: boardsService.moveTicket.bind(boardsService),
           archiveTicket: boardsService.archiveTicket.bind(boardsService),
+        };
+
+        const boardBackgrounds = {
+          list: boardBackgroundsService.list.bind(boardBackgroundsService),
         };
 
         const makeTickets = (actorId: string | null) => ({
@@ -284,20 +310,50 @@ async function bootstrap() {
         };
 
         if (!token) {
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), ticketReminders, notifications, activityLogs };
+          return {
+            user: null,
+            users,
+            workspaces,
+            boards,
+            boardBackgrounds,
+            tickets: makeTickets(null),
+            ticketReminders,
+            notifications,
+            activityLogs,
+          };
         }
 
         try {
           const decoded = await firebaseAuth.verifyIdToken(token);
           const user = await usersService.ensureUserExists(decoded);
-          return { user, users, workspaces, boards, tickets: makeTickets(user.id), ticketReminders, notifications, activityLogs };
+          return {
+            user,
+            users,
+            workspaces,
+            boards,
+            boardBackgrounds,
+            tickets: makeTickets(user.id),
+            ticketReminders,
+            notifications,
+            activityLogs,
+          };
         } catch (e) {
           if (process.env.NODE_ENV !== 'production') {
             const err = e as { message?: string; code?: string };
             // eslint-disable-next-line no-console
             console.warn('[trpc] verifyIdToken failed', { code: err?.code, message: err?.message });
           }
-          return { user: null, users, workspaces, boards, tickets: makeTickets(null), ticketReminders, notifications, activityLogs };
+          return {
+            user: null,
+            users,
+            workspaces,
+            boards,
+            boardBackgrounds,
+            tickets: makeTickets(null),
+            ticketReminders,
+            notifications,
+            activityLogs,
+          };
         }
       },
     }),
