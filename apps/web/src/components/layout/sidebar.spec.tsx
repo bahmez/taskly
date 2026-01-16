@@ -11,7 +11,7 @@ let workspaceState = {
     { id: 'w1', title: 'Workspace A', description: '' },
     { id: 'w2', title: 'Workspace B', description: '' },
   ],
-  selectedWorkspaceId: 'w1',
+  selectedWorkspaceId: 'w1' as string | null,
   setSelectedWorkspaceId: vi.fn(),
   isLoading: false,
 };
@@ -49,7 +49,7 @@ vi.mock('@/app/trpc', () => ({
     workspaces: {
       boards: {
         list: {
-          useQuery: (...args: unknown[]) => mockUseQuery(...args),
+          useQuery: vi.fn(() => mockUseQuery()),
         },
         create: {
           useMutation: () => ({ mutate: mockMutate, isPending: false }),

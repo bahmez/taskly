@@ -1,3 +1,21 @@
+/**
+ * Application Sidebar Component
+ *
+ * Left navigation panel displaying:
+ * - Workspace switcher
+ * - Boards within the selected workspace
+ * - Quick navigation links (Members, Settings)
+ * - Create new board button
+ *
+ * Features:
+ * - Collapsible/expandable state for responsive layout
+ * - Board creation dialog
+ * - Workspace quick navigation
+ * - Active state highlighting
+ *
+ * Accepts controlled or uncontrolled collapse state.
+ */
+
 "use client"
 
 import * as React from "react"
@@ -8,8 +26,14 @@ import { usePathname, useRouter } from "next/navigation"
 import { api } from "@/app/trpc"
 import { useWorkspaceUI } from "@/components/workspace/workspace-ui-provider"
 
+/**
+ * Props for Sidebar component.
+ * Supports both controlled and uncontrolled collapse state.
+ */
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Controlled collapse state (overrides internal state if provided) */
   isCollapsed?: boolean
+  /** Callback when collapse state changes */
   onCollapse?: (collapsed: boolean) => void
 }
 

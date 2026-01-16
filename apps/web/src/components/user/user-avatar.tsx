@@ -1,8 +1,25 @@
+/**
+ * User Avatar Component
+ *
+ * Displays user avatar with support for:
+ * - Uploaded image avatars
+ * - Initials-based avatars with deterministic colors
+ * - Gradient/color backgrounds
+ *
+ * Avatar generation rules:
+ * 1. If user has image avatar: show image
+ * 2. If user has background avatar: show initials with background
+ * 3. Otherwise: show initials with color based on username hash
+ *
+ * Initials priority: first+last name > username > fallback
+ */
+
 import React from 'react';
 import { Avatar, AvatarFallback, cn } from '@taskly/ui';
 import type { BoardBackground, UserAvatar as UserAvatarType } from '@taskly/trpc';
 import { getBoardBackgroundStyle } from '@/components/board/board-background';
 
+/** Shape of user object for avatar display */
 type UserLike = {
   id?: string;
   username?: string | null;
@@ -11,6 +28,7 @@ type UserLike = {
   avatar?: UserAvatarType | null;
 };
 
+/** Color palette for deterministic avatar background colors based on username */
 const AVATAR_COLOR_PALETTE = [
   '#0EA5E9',
   '#2563EB',
@@ -24,6 +42,13 @@ const AVATAR_COLOR_PALETTE = [
   '#4F46E5',
 ];
 
+/**
+ * Generates a deterministic color from a username using hash function.
+ * Same username always generates the same color.
+ * 
+ * @param username - Username to hash
+ * @returns Hex color from palette
+ */
 function colorFromUsername(username: string): string {
   const value = username.trim() || 'user';
   let hash = 0;
@@ -33,6 +58,13 @@ function colorFromUsername(username: string): string {
   return AVATAR_COLOR_PALETTE[hash % AVATAR_COLOR_PALETTE.length]!;
 }
 
+/**
+ * Generates initials from user's name or username.
+ * Priority: first+last name > username > 'U' fallback
+ * 
+ * @param user - User object with name/username fields
+ * @returns Two-character uppercase initials
+ */
 function initialsFromUser(user: UserLike): string {
   const first = (user.first_name ?? '').trim();
   const last = (user.last_name ?? '').trim();
