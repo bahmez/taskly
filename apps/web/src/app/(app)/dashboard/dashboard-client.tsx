@@ -33,6 +33,7 @@ import {
 } from '@taskly/ui';
 import { api } from '@/app/trpc';
 import { getBoardBackgroundStyle } from '@/components/board/board-background';
+import { useTranslation } from '@/lib/i18n';
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -59,6 +60,7 @@ function WorkspaceBoardsSection({
   boardsPage: number;
   setBoardsPage: (next: number) => void;
 }) {
+  const { t } = useTranslation();
   // Query boards for this workspace
   const boardsQuery = api.workspaces.boards.list.useQuery({ workspaceId: workspace.id });
   const boards = boardsQuery.data ?? [];
@@ -71,9 +73,9 @@ function WorkspaceBoardsSection({
   return (
     <div className="mt-4">
       {boardsQuery.isLoading ? (
-        <div className="text-sm text-[#9fadbc]">Chargement des boards…</div>
+        <div className="text-sm text-[#9fadbc]">{t('dashboard.loading_boards')}</div>
       ) : boards.length === 0 ? (
-        <div className="text-sm text-[#9fadbc]">Aucun board dans ce workspace.</div>
+        <div className="text-sm text-[#9fadbc]">{t('dashboard.no_board_in_workspace')}</div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -83,7 +85,7 @@ function WorkspaceBoardsSection({
                   <div className="h-8" style={getBoardBackgroundStyle(b.background, { preferThumb: true })} />
                   <div className="flex-1 p-3 flex flex-col justify-between">
                     <div className="text-sm font-semibold text-[#b6c2cf] group-hover:text-white truncate">{b.title}</div>
-                    <div className="text-xs text-[#9fadbc]">Ouvrir →</div>
+                    <div className="text-xs text-[#9fadbc]">{t('dashboard.open')}</div>
                   </div>
                 </div>
               </Link>
@@ -98,7 +100,7 @@ function WorkspaceBoardsSection({
                 disabled={page <= 1}
                 onClick={() => setBoardsPage(page - 1)}
               >
-                Précédent
+                {t('dashboard.previous')}
               </Button>
               <div className="text-xs text-[#9fadbc]">
                 Page {page} / {totalPages}
@@ -109,7 +111,7 @@ function WorkspaceBoardsSection({
                 disabled={page >= totalPages}
                 onClick={() => setBoardsPage(page + 1)}
               >
-                Suivant
+                {t('dashboard.next')}
               </Button>
             </div>
           )}
@@ -120,6 +122,7 @@ function WorkspaceBoardsSection({
 }
 
 export default function DashboardClient() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const archivedView = searchParams.get('archived') === '1';
@@ -154,14 +157,14 @@ export default function DashboardClient() {
       <div className="p-6 text-[#b6c2cf]">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="mt-2 text-[#9fadbc]">
-          {archivedView ? 'Aucun workspace archivé.' : 'Il n’y a pas encore de workspace.'}
+          {archivedView ? t('dashboard.no_archived_workspace') : t('dashboard.no_workspace_yet')}
         </p>
 
         {!archivedView && (
           <div className="mt-6 max-w-lg">
           <Card className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
             <CardHeader>
-              <CardTitle className="text-lg">Créer un workspace</CardTitle>
+              <CardTitle className="text-lg">{t('dashboard.create_board')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Input value={wsTitle} onChange={(e) => setWsTitle(e.target.value)} placeholder="Workspace title" />
@@ -171,7 +174,7 @@ export default function DashboardClient() {
                 disabled={!wsTitle.trim() || createWorkspace.isPending}
                 onClick={() => createWorkspace.mutate({ title: wsTitle.trim(), description: wsDesc.trim() || undefined })}
               >
-                Créer
+                {t('actions.create')}
               </Button>
             </CardContent>
           </Card>
@@ -192,7 +195,7 @@ export default function DashboardClient() {
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
           <p className="mt-2 text-[#9fadbc]">
-            {archivedView ? 'Workspaces archivés.' : 'Tous tes workspaces, et un aperçu de leurs boards.'}
+            {archivedView ? t('dashboard.archived_workspaces') : t('dashboard.all_workspaces')}
           </p>
         </div>
 
@@ -200,11 +203,11 @@ export default function DashboardClient() {
           {!archivedView && (
             <Dialog>
             <DialogTrigger asChild>
-              <Button variant="trelloGray">Créer un workspace</Button>
+              <Button variant="trelloGray">{t('dashboard.create_board')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Créer un workspace</DialogTitle>
+                <DialogTitle>{t('dashboard.create_board')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
                 <Input value={wsTitle} onChange={(e) => setWsTitle(e.target.value)} placeholder="Workspace title" />
@@ -220,7 +223,7 @@ export default function DashboardClient() {
                     setWsDesc('');
                   }}
                 >
-                  Créer
+                  {t('actions.create')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -245,11 +248,11 @@ export default function DashboardClient() {
                     disabled={unarchive.isPending}
                     onClick={() => unarchive.mutate({ workspaceId: ws.id })}
                   >
-                    Retirer des archives
+                    {t('dashboard.remove_from_archives')}
                   </Button>
                 ) : (
                   <Button asChild variant="trelloGray">
-                    <Link href={`/dashboard/workspaces/${ws.id}`}>Voir plus</Link>
+                    <Link href={`/dashboard/workspaces/${ws.id}`}>{t('navbar.see_more')}</Link>
                   </Button>
                 )}
               </div>
@@ -278,7 +281,7 @@ export default function DashboardClient() {
               disabled={wsPage <= 1}
               onClick={() => setWorkspacePage(wsPage - 1)}
             >
-              Précédent
+              {t('dashboard.previous')}
             </Button>
             <div className="text-xs text-[#9fadbc]">
               Page {wsPage} / {workspacesTotalPages}
@@ -289,7 +292,7 @@ export default function DashboardClient() {
               disabled={wsPage >= workspacesTotalPages}
               onClick={() => setWorkspacePage(wsPage + 1)}
             >
-              Suivant
+              {t('dashboard.next')}
             </Button>
           </div>
         )}
@@ -297,5 +300,3 @@ export default function DashboardClient() {
     </div>
   );
 }
-
-

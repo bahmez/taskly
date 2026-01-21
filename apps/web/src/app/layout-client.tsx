@@ -7,17 +7,22 @@
 
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
-import { useLanguage } from '@/lib/i18n';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLanguage, LanguageProvider } from '@/lib/i18n';
 
-export function RootLayoutClient({ children }: { children: ReactNode }) {
+function RootLayoutClientInner({ children }: { children: ReactNode }) {
   const { language, mounted } = useLanguage();
+  const [domReady, setDomReady] = useState(false);
 
   useEffect(() => {
-    if (mounted) {
+    setDomReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && domReady) {
       document.documentElement.lang = language;
     }
-  }, [language, mounted]);
+  }, [language, mounted, domReady]);
 
   return (
     <html lang={language} suppressHydrationWarning>
@@ -26,5 +31,13 @@ export function RootLayoutClient({ children }: { children: ReactNode }) {
         {children}
       </body>
     </html>
+  );
+}
+
+export function RootLayoutClient({ children }: { children: ReactNode }) {
+  return (
+    <LanguageProvider>
+      <RootLayoutClientInner>{children}</RootLayoutClientInner>
+    </LanguageProvider>
   );
 }

@@ -47,6 +47,7 @@ import { updateProfile } from "firebase/auth"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { getBoardBackgroundStyle } from "@/components/board/board-background"
 import { LanguageSwitcherDark } from "@/components/language-switcher"
+import { useTranslation } from "@/lib/i18n"
 
 /**
  * Formats notification timestamp for display.
@@ -67,6 +68,7 @@ export function Navbar() {
   const isDashboardOverview = pathname === "/dashboard" || pathname === "/workspaces"
   const utils = api.useUtils()
   const { toast } = useToast()
+  const { t } = useTranslation()
   const { workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useWorkspaceUI()
   const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId) ?? null
   const { user: firebaseUser, logout } = useAuth()
@@ -100,7 +102,7 @@ export function Navbar() {
       await utils.users.me.invalidate()
       await utils.users.byIds.invalidate()
       await utils.users.byId.invalidate()
-      toast({ title: "Photo updated" })
+      toast({ title: t('toast.photo_updated') })
     },
   })
 
@@ -211,7 +213,7 @@ export function Navbar() {
     async (file: File) => {
       let objectPath: string | null = null
       try {
-        toast({ title: "Uploading..." })
+        toast({ title: t('toast.uploading') })
         const res = await createAvatarUpload.mutateAsync({
           filename: file.name,
           contentType: file.type || "application/octet-stream",
@@ -237,9 +239,9 @@ export function Navbar() {
       } catch (err) {
         const error = err as Error
         toast({
-          title: "Upload failed",
+          title: t('toast.upload_failed'),
           description: error.message.includes("client_email")
-            ? "GCS credentials not configured"
+            ? t('navbar.gcs_credentials_not_configured')
             : error.message ||
               "Failed to upload file. If you see a CORS error in the console, update bucket CORS for your origin.",
           variant: "destructive",
@@ -270,14 +272,14 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center ml-2 gap-1">
           <Button asChild variant="ghost" className="h-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] font-normal px-3">
-            <Link href="/dashboard">Workspaces</Link>
+            <Link href="/dashboard">{t('navbar.workspaces')}</Link>
           </Button>
           <Button
             variant="ghost"
             className="h-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] font-normal px-3"
             onClick={() => router.push("/dashboard?archived=1")}
           >
-            Archived
+            {t('navbar.archived')}
           </Button>
 
           <DropdownMenu>
@@ -286,7 +288,7 @@ export function Navbar() {
                 variant="ghost"
                 className="h-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] font-normal px-3"
               >
-                {selectedWorkspace?.title ?? "Workspaces"} <span className="ml-2 text-xs">▼</span>
+                {selectedWorkspace?.title ?? t('navbar.workspaces')} <span className="ml-2 text-xs">▼</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -300,24 +302,24 @@ export function Navbar() {
                 <DialogTrigger asChild>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                     <span className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" /> Create workspace
+                      <Plus className="h-4 w-4" /> {t('navbar.create_workspace')}
                     </span>
                   </DropdownMenuItem>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Create workspace</DialogTitle>
+                    <DialogTitle>{t('navbar.create_workspace')}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-3">
                     <Input
                       value={wsTitle}
                       onChange={(e) => setWsTitle(e.target.value)}
-                      placeholder="Workspace title"
+                      placeholder={t('navbar.workspace_title_placeholder')}
                     />
                     <Textarea
                       value={wsDesc}
                       onChange={(e) => setWsDesc(e.target.value)}
-                      placeholder="Description (optional)"
+                      placeholder={t('navbar.description_optional')}
                     />
                   </div>
                   <DialogFooter>
@@ -331,7 +333,7 @@ export function Navbar() {
                         setCreateWorkspaceOpen(false)
                       }}
                     >
-                      Create
+                      {t('navbar.create')}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -348,15 +350,15 @@ export function Navbar() {
                   className="h-8 ml-2 bg-[#579dff] hover:bg-[#85b8ff] text-[#1d2125] font-semibold"
                   disabled={!selectedWorkspaceId}
                 >
-                  Create
+                  {t('navbar.create')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create board</DialogTitle>
+                  <DialogTitle>{t('navbar.create_board')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-2">
-                  <Input value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} placeholder="Board title" />
+                  <Input value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} placeholder={t('navbar.board_title_placeholder')} />
                 </div>
                 <DialogFooter>
                   <Button
@@ -369,7 +371,7 @@ export function Navbar() {
                       setCreateBoardOpen(false)
                     }}
                   >
-                    Create
+                    {t('navbar.create')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -383,7 +385,7 @@ export function Navbar() {
         <div className="relative hidden sm:block mr-1">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9fadbc]" />
           <Input
-            placeholder="Search"
+            placeholder={t('navbar.search_placeholder')}
             className="h-8 w-56 bg-[#22272b] border-[#9fadbc29] pl-8 text-[#9fadbc] placeholder:text-[#9fadbc] hover:bg-[#2c333a] focus:bg-white focus:text-black focus:placeholder:text-gray-500 transition-all"
           />
         </div>
@@ -407,7 +409,7 @@ export function Navbar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-96">
             <div className="flex items-center justify-between px-3 py-2">
-              <div className="text-sm font-semibold text-[#b6c2cf]">Notifications</div>
+              <div className="text-sm font-semibold text-[#b6c2cf]">{t('navbar.notifications')}</div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -415,15 +417,15 @@ export function Navbar() {
                 disabled={unreadCount === 0 || markAllRead.isPending}
                 onClick={() => markAllRead.mutate()}
               >
-                Tout marquer comme lu
+                {t('navbar.mark_all_as_read')}
               </Button>
             </div>
             <DropdownMenuSeparator />
 
             {notificationsQuery.isLoading ? (
-              <div className="px-3 py-3 text-sm text-[#9fadbc]">Chargement…</div>
+              <div className="px-3 py-3 text-sm text-[#9fadbc]">{t('navbar.loading')}</div>
             ) : notifications.length === 0 ? (
-              <div className="px-3 py-6 text-sm text-[#9fadbc]">Aucune notification pour le moment.</div>
+              <div className="px-3 py-6 text-sm text-[#9fadbc]">{t('navbar.no_notifications')}</div>
             ) : (
               <div className="max-h-[360px] overflow-y-auto">
                 {notifications.map((n) => {
@@ -460,7 +462,7 @@ export function Navbar() {
                 router.push("/dashboard/notifications")
               }}
             >
-              Voir plus
+              {t('navbar.see_more')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -486,40 +488,40 @@ export function Navbar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72">
             <div className="px-3 py-2">
-              <div className="text-sm font-semibold text-[#b6c2cf] truncate">{meQuery.data?.username ?? "User"}</div>
+              <div className="text-sm font-semibold text-[#b6c2cf] truncate">{meQuery.data?.username ?? t('navbar.account')}</div>
               <div className="text-xs text-[#9fadbc] truncate">{firebaseUser?.email ?? firebaseUser?.uid ?? ""}</div>
             </div>
             <DropdownMenuSeparator />
 
             <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
               <DialogTrigger asChild>
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Profile</DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>{t('navbar.profile')}</DropdownMenuItem>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Profile</DialogTitle>
+                  <DialogTitle>{t('navbar.profile')}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
                   <div className="rounded-md border border-[#9fadbc29] p-3">
-                    <div className="text-xs text-[#9fadbc]">Account</div>
-                    <div className="text-sm text-[#b6c2cf] mt-1">Email: {firebaseUser?.email ?? "-"}</div>
+                    <div className="text-xs text-[#9fadbc]">{t('navbar.account_info')}</div>
+                    <div className="text-sm text-[#b6c2cf] mt-1">{t('navbar.email')}: {firebaseUser?.email ?? "-"}</div>
                     <div className="text-sm text-[#b6c2cf]">ID: {firebaseUser?.uid ?? "-"}</div>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <UserAvatar user={me ?? { username: firebaseUser?.displayName ?? firebaseUser?.email ?? "User" }} className="h-12 w-12" />
                     <div className="flex-1">
-                      <div className="text-xs text-[#9fadbc]">Profile photo</div>
+                      <div className="text-xs text-[#9fadbc]">{t('navbar.profile_photo')}</div>
                       <Dialog open={avatarOpen} onOpenChange={setAvatarOpen}>
                         <DialogTrigger asChild>
                           <Button variant="trelloGray" size="sm" className="mt-2">
-                            Change avatar
+                            {t('navbar.change_avatar')}
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
                           <DialogHeader>
-                            <DialogTitle>Update avatar</DialogTitle>
+                            <DialogTitle>{t('navbar.update_avatar')}</DialogTitle>
                           </DialogHeader>
 
                           <div className="flex flex-wrap items-center gap-2">
@@ -534,7 +536,7 @@ export function Navbar() {
                                 ].join(" ")}
                                 onClick={() => setAvatarTab(tab)}
                               >
-                                {tab === "image" ? "Unsplash" : tab === "upload" ? "Upload" : tab}
+                                {tab === "image" ? "Unsplash" : tab === "upload" ? t('navbar.upload_photo') : tab}
                               </Button>
                             ))}
                             <Button
@@ -547,7 +549,7 @@ export function Navbar() {
                                 setAvatarOpen(false)
                               }}
                             >
-                              Reset
+                              {t('navbar.reset')}
                             </Button>
                           </div>
 
@@ -555,7 +557,7 @@ export function Navbar() {
                             <Input
                               value={avatarSearch}
                               onChange={(e) => setAvatarSearch(e.target.value)}
-                              placeholder="Search Unsplash"
+                              placeholder={t('navbar.search_placeholder')}
                             />
                           )}
 
@@ -614,7 +616,7 @@ export function Navbar() {
                                 onClick={() => avatarBackgroundsQuery.fetchNextPage()}
                                 disabled={avatarBackgroundsQuery.isFetchingNextPage}
                               >
-                                {avatarBackgroundsQuery.isFetchingNextPage ? "Loading…" : "Load more"}
+                                {avatarBackgroundsQuery.isFetchingNextPage ? t('navbar.loading') : t('navbar.load_more')}
                               </Button>
                             </div>
                           )}
@@ -624,27 +626,27 @@ export function Navbar() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-xs text-[#9fadbc]">Display name</div>
-                    <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Display name" />
+                    <div className="text-xs text-[#9fadbc]">{t('navbar.display_name')}</div>
+                    <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('navbar.display_name')} />
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-xs text-[#9fadbc]">Username</div>
-                    <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+                    <div className="text-xs text-[#9fadbc]">{t('navbar.username')}</div>
+                    <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('navbar.username')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <div className="text-xs text-[#9fadbc]">First name</div>
-                      <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+                      <div className="text-xs text-[#9fadbc]">{t('navbar.first_name')}</div>
+                      <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t('navbar.first_name')} />
                     </div>
                     <div className="space-y-2">
-                      <div className="text-xs text-[#9fadbc]">Last name</div>
-                      <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+                      <div className="text-xs text-[#9fadbc]">{t('navbar.last_name')}</div>
+                      <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t('navbar.last_name')} />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-xs text-[#9fadbc]">Description</div>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="About you…" />
+                    <div className="text-xs text-[#9fadbc]">{t('navbar.description')}</div>
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('navbar.about_you')} />
                   </div>
                 </div>
 
@@ -662,7 +664,7 @@ export function Navbar() {
                       setDisplayName(firebaseUser?.displayName ?? "")
                     }}
                   >
-                    Reset
+                    {t('navbar.reset')}
                   </Button>
                   <Button
                     variant="trello"
@@ -691,7 +693,7 @@ export function Navbar() {
                       setProfileOpen(false)
                     }}
                   >
-                    Save
+                    {t('navbar.save')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -703,7 +705,7 @@ export function Navbar() {
                 router.replace("/login")
               }}
             >
-              Logout
+              {t('navbar.logout')}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
@@ -713,12 +715,12 @@ export function Navbar() {
                   className="text-red-500 focus:text-red-500"
                   onSelect={(e) => e.preventDefault()}
                 >
-                  Delete account
+                  {t('navbar.delete_account')}
                 </DropdownMenuItem>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Delete account</DialogTitle>
+                  <DialogTitle>{t('navbar.delete_account_confirmation')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3">
                   <p className="text-sm text-[#9fadbc]">
@@ -739,7 +741,7 @@ export function Navbar() {
                       setDeleteConfirm("")
                     }}
                   >
-                    Cancel
+                    {t('navbar.cancel')}
                   </Button>
                   <Button
                     variant="destructive"
@@ -750,7 +752,7 @@ export function Navbar() {
                       setDeleteConfirm("")
                     }}
                   >
-                    Delete
+                    {t('navbar.delete')}
                   </Button>
                 </DialogFooter>
               </DialogContent>

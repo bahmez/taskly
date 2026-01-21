@@ -141,13 +141,27 @@ t('landing.footer_copyright', { year: new Date().getFullYear() })
 
 ## Next Steps
 
-To apply translations to the entire application:
+To add more languages to the application:
 
-1. **Update Dashboard Pages** - Apply `useTranslation` hook to dashboard components
-2. **Update Settings Pages** - Translate all settings and configuration labels
-3. **Update Notification Pages** - Translate notification messages
-4. **Add More Languages** - Create additional locale files (e.g., `de`, `es`, `it`)
-5. **Backend Translations** - Coordinate with API to send translated content when needed
+1. **Create new locale files** - Create `public/locales/{lang}/common.json` (e.g., `de`, `es`, `it`)
+2. **Update configuration** - Add the new language to `next-i18next.config.ts` in the `locales` array
+3. **Update language switcher** - Add new `SelectItem` to both `LanguageSwitcher` and `LanguageSwitcherDark` components
+
+## Implementation Status
+
+✅ **Complete**: i18n implementation with translations applied to:
+- Landing page (`src/app/page.tsx`)
+- Authentication pages (`src/app/(auth)/login/login-client.tsx`, `src/app/(auth)/register/page.tsx`)
+- Dashboard pages:
+  - `src/app/(app)/dashboard-client.tsx` - Main dashboard with workspace overview
+  - `src/app/(app)/workspaces/[workspaceId]/workspace-boards-client.tsx` - Workspace boards
+  - `src/app/(app)/members/members-client.tsx` - Member management
+  - `src/app/(app)/settings/settings-client.tsx` - Workspace settings
+  - `src/app/(app)/notifications/notifications-client.tsx` - Notifications
+- Navbar (`src/components/layout/navbar.tsx`) - All navigation and user menus
+- Invite flow (`src/app/(app)/invite/invite-client.tsx`)
+
+All hardcoded French/English strings have been replaced with `t()` calls using the `useTranslation()` hook.
 
 ## Configuration
 

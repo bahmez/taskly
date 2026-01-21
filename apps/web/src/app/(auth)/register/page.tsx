@@ -31,8 +31,8 @@ export default function RegisterPage() {
     e.preventDefault();
     if (password !== password2) {
       toast({
-        title: 'Password',
-        description: 'Passwords do not match.',
+        title: t('auth.password_label'),
+        description: t('toast.password_mismatch'),
         variant: 'destructive',
       });
       return;
@@ -44,8 +44,8 @@ export default function RegisterPage() {
       router.replace('/dashboard');
     } catch (err) {
       toast({
-        title: 'Registration failed',
-        description: err instanceof Error ? err.message : 'An error occurred.',
+        title: t('toast.registration_failed'),
+        description: err instanceof Error ? err.message : t('auth.error_default'),
         variant: 'destructive',
       });
     } finally {
