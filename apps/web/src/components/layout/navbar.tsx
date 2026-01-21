@@ -250,7 +250,7 @@ export function Navbar() {
         })
       }
     },
-    [createAvatarUpload, completeAvatarUpload, toast, setAvatarOpen],
+    [createAvatarUpload, completeAvatarUpload, toast, setAvatarOpen, t],
   )
 
   return (

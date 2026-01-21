@@ -69,7 +69,7 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [setOpen])
 
   // Search query
   const searchQuery = api.search.all.useQuery(
@@ -86,6 +86,19 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
       ...boards,
     ]
   }, [searchQuery.data])
+
+  // Handler for selecting a result
+  const handleSelectResult = React.useCallback((result: SearchResult | undefined) => {
+    if (!result) return
+
+    if (result.type === 'workspace') {
+      router.push(`/dashboard/workspaces/${result.id}`)
+    } else {
+      router.push(`/dashboard/boards/${result.id}`)
+    }
+    
+    setOpen(false)
+  }, [router, setOpen])
 
   // Reset selected index when results change
   React.useEffect(() => {
@@ -114,7 +127,7 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, results, selectedIndex])
+  }, [open, results, selectedIndex, handleSelectResult, setOpen])
 
   // Scroll selected item into view
   React.useEffect(() => {
@@ -139,40 +152,28 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
     }
   }, [open])
 
-  const handleSelectResult = (result: SearchResult | undefined) => {
-    if (!result) return
-
-    if (result.type === 'workspace') {
-      router.push(`/dashboard/workspaces/${result.id}`)
-    } else {
-      router.push(`/dashboard/boards/${result.id}`)
-    }
-    
-    setOpen(false)
-  }
-
   const getResultIcon = (type: 'workspace' | 'board') => {
     return type === 'workspace' ? Briefcase : Layout
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-2xl p-0 gap-0 bg-[#1d2125] border-[#9fadbc29] overflow-hidden">
-        <div className="flex items-center border-b border-[#9fadbc29] px-4 py-3">
-          <Search className="h-5 w-5 text-[#9fadbc] mr-3" />
+      <DialogContent className="max-w-2xl p-0 gap-0 bg-[#1d2125] border-[#9fadbc29] overflow-hidden" onEscapeKeyDown={() => setOpen(false)}>
+        <div className="flex items-center border-b border-[#9fadbc29] px-4 py-3 pr-14">
+          <Search className="h-5 w-5 text-[#9fadbc] mr-3 flex-shrink-0" />
           <Input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`${t('navbar.search_placeholder')} (Cmd+K / Ctrl+K)`}
-            className="border-0 bg-transparent text-[#b6c2cf] placeholder:text-[#9fadbc] focus-visible:ring-0 focus-visible:ring-offset-0 h-auto p-0 text-base"
+            className="border-0 bg-transparent text-[#b6c2cf] placeholder:text-[#9fadbc] focus-visible:ring-0 focus-visible:ring-offset-0 h-auto p-0 text-base flex-1"
           />
           {query && (
             <button
               onClick={() => setQuery("")}
-              className="ml-2 text-xs text-[#9fadbc] hover:text-white px-2 py-1 rounded bg-[#282e33] hover:bg-[#323940]"
+              className="ml-2 text-xs text-[#9fadbc] hover:text-white px-2 py-1 rounded bg-[#282e33] hover:bg-[#323940] flex-shrink-0"
             >
-              Clear
+              {t('navbar.search_clear')}
             </button>
           )}
         </div>
@@ -191,7 +192,7 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
             </div>
           ) : results.length === 0 ? (
             <div className="px-4 py-8 text-center text-[#9fadbc] text-sm">
-              No results found for "{debouncedQuery}"
+              {t('navbar.search_no_results')} &ldquo;{debouncedQuery}&rdquo;
             </div>
           ) : (
             <div className="space-y-1">
@@ -235,7 +236,7 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
                             ? 'bg-[#22272b] text-[#9fadbc]'
                             : 'bg-[#22272b] text-[#9fadbc]'
                       }`}>
-                        {result.type === 'workspace' ? 'Workspace' : 'Board'}
+                        {result.type === 'workspace' ? t('navbar.search_workspace') : t('navbar.search_board')}
                       </div>
                     </div>
                   </button>
@@ -249,17 +250,17 @@ export function SearchDialog({ open: controlledOpen, onOpenChange }: SearchDialo
           <div className="border-t border-[#9fadbc29] px-4 py-2 text-xs text-[#9fadbc] flex items-center justify-between">
             <div className="flex gap-4">
               <span>
-                <kbd className="px-1.5 py-0.5 bg-[#22272b] rounded border border-[#9fadbc29]">↑↓</kbd> Navigate
+                <kbd className="px-1.5 py-0.5 bg-[#22272b] rounded border border-[#9fadbc29]">↑↓</kbd> {t('navbar.search_navigate')}
               </span>
               <span>
-                <kbd className="px-1.5 py-0.5 bg-[#22272b] rounded border border-[#9fadbc29]">Enter</kbd> Select
+                <kbd className="px-1.5 py-0.5 bg-[#22272b] rounded border border-[#9fadbc29]">Enter</kbd> {t('navbar.search_select')}
               </span>
               <span>
-                <kbd className="px-1.5 py-0.5 bg-[#22272b] rounded border border-[#9fadbc29]">Esc</kbd> Close
+                <kbd className="px-1.5 py-0.5 bg-[#22272b] rounded border border-[#9fadbc29]">Esc</kbd> {t('navbar.search_close')}
               </span>
             </div>
             <div>
-              {results.length} {results.length === 1 ? 'result' : 'results'}
+              {results.length} {results.length === 1 ? t('navbar.search_result') : t('navbar.search_results')}
             </div>
           </div>
         )}
