@@ -117,6 +117,7 @@
     "description_optional": "Description (optional)",
     "board_title_placeholder": "Board title",
     "search_placeholder": "Search",
+    "search_start_typing": "Start typing to search workspaces and boards…",
     "mark_all_as_read": "Mark all as read",
     "notifications": "Notifications",
     "loading": "Loading…",
