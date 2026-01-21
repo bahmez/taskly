@@ -1,0 +1,110 @@
+{
+  "common": {
+    "home": "Home",
+    "login": "Sign in",
+    "register": "Sign up",
+    "logout": "Sign out",
+    "dashboard": "Dashboard"
+  },
+  "header": {
+    "login_button": "Sign in",
+    "register_button": "Sign up",
+    "dashboard_button": "Go to dashboard",
+    "logout_button": "Sign out"
+  },
+  "landing": {
+    "title": "Manage your projects with clarity, speed and peace of mind.",
+    "description": "Taskly centralizes your tasks, teams and decisions in simple and visual boards. Go from idea to execution without friction.",
+    "features_title": "Everything you need to deliver better, together.",
+    "features": [
+      {
+        "title": "Clear and fast boards",
+        "description": "Organize your tasks in columns and keep an overview."
+      },
+      {
+        "title": "Real-time collaboration",
+        "description": "Invite your teammates, assign tasks and track progress."
+      },
+      {
+        "title": "Useful notifications",
+        "description": "Get important updates without being overwhelmed."
+      },
+      {
+        "title": "Multi-workspace management",
+        "description": "Separate your personal, client or team projects with one click."
+      }
+    ],
+    "steps_title": "A simple 3-step workflow",
+    "steps_description": "Taskly adapts to your pace. Start small, scale fast.",
+    "steps": [
+      {
+        "title": "Create a workspace",
+        "description": "Start a project in seconds."
+      },
+      {
+        "title": "Invite your team",
+        "description": "Add members and set roles."
+      },
+      {
+        "title": "Launch your board",
+        "description": "Organize, prioritize and deliver faster."
+      }
+    ],
+    "cta_title": "Ready to make your teams more fluid?",
+    "cta_description": "Get started now and invite your team in minutes.",
+    "cta_button": "Create account",
+    "start_free": "Start free",
+    "have_account": "Already have an account",
+    "resume_work": "Resume my work",
+    "view_workspaces": "View my workspaces",
+    "new_feature": "New: Google and GitHub integrations",
+    "tagline": "No commitment",
+    "tagline_security": "Firebase security",
+    "tagline_collab": "Smooth collaboration",
+    "footer_copyright": "© {{year}} Taskly. All rights reserved.",
+    "footer_links": [
+      {
+        "label": "Sign in",
+        "href": "/login"
+      },
+      {
+        "label": "Sign up",
+        "href": "/register"
+      },
+      {
+        "label": "Dashboard",
+        "href": "/dashboard"
+      }
+    ],
+    "example_board_title": "Marketing Board",
+    "example_board_status": "In progress",
+    "example_tasks_ready": "3 tasks ready to be delivered",
+    "why_taskly": "Why Taskly"
+  },
+  "auth": {
+    "login_title": "Sign in",
+    "login_description": "Sign in with your email and password.",
+    "register_title": "Create account",
+    "register_description": "Create an account to access Taskly.",
+    "email_label": "Email",
+    "password_label": "Password",
+    "password_confirm_label": "Confirm password",
+    "email_placeholder": "you@example.com",
+    "continue_google": "Continue with Google",
+    "continue_github": "Continue with GitHub",
+    "continue_google_loading": "Google sign in…",
+    "continue_github_loading": "GitHub sign in…",
+    "sign_in": "Sign in",
+    "sign_in_loading": "Signing in…",
+    "no_account": "Don't have an account?",
+    "create_account": "Create account",
+    "have_account": "Already have an account?",
+    "sign_up": "Sign up",
+    "sign_up_loading": "Signing up…",
+    "or": "or",
+    "error_title": "Sign in failed",
+    "error_default": "An error occurred.",
+    "login_link": "Sign in",
+    "register_link": "Sign up"
+  }
+}

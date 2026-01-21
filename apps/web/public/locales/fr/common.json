@@ -1,0 +1,110 @@
+{
+  "common": {
+    "home": "Accueil",
+    "login": "Connexion",
+    "register": "Créer un compte",
+    "logout": "Se déconnecter",
+    "dashboard": "Dashboard"
+  },
+  "header": {
+    "login_button": "Se connecter",
+    "register_button": "Créer un compte",
+    "dashboard_button": "Aller au dashboard",
+    "logout_button": "Se déconnecter"
+  },
+  "landing": {
+    "title": "Gérez vos projets avec clarté, vitesse et sérénité.",
+    "description": "Taskly centralise vos tâches, vos équipes et vos décisions dans des boards simples et visuels. Passez de l'idée à l'exécution sans friction.",
+    "features_title": "Tout ce qu'il faut pour livrer mieux, ensemble.",
+    "features": [
+      {
+        "title": "Tableaux clairs et rapides",
+        "description": "Organisez vos tâches en colonnes et gardez une vue d'ensemble."
+      },
+      {
+        "title": "Collaboration en temps réel",
+        "description": "Invitez vos coéquipiers, assignez des tâches et suivez l'avancement."
+      },
+      {
+        "title": "Notifications utiles",
+        "description": "Recevez les mises à jour importantes sans être submergé."
+      },
+      {
+        "title": "Gestion multi‑workspaces",
+        "description": "Séparez vos projets perso, clients ou équipes en un clic."
+      }
+    ],
+    "steps_title": "Un flux simple en 3 étapes",
+    "steps_description": "Taskly s'adapte à votre rythme. Commencez petit, évoluez vite.",
+    "steps": [
+      {
+        "title": "Créez un workspace",
+        "description": "Démarrez un projet en quelques secondes."
+      },
+      {
+        "title": "Invitez votre équipe",
+        "description": "Ajoutez des membres et définissez les rôles."
+      },
+      {
+        "title": "Lancez votre board",
+        "description": "Organisez, priorisez et livrez plus vite."
+      }
+    ],
+    "cta_title": "Prêt à rendre vos équipes plus fluides ?",
+    "cta_description": "Commencez maintenant et invitez votre équipe en quelques minutes.",
+    "cta_button": "Créer un compte",
+    "start_free": "Démarrer gratuitement",
+    "have_account": "J'ai déjà un compte",
+    "resume_work": "Reprendre mon travail",
+    "view_workspaces": "Voir mes workspaces",
+    "new_feature": "Nouveau: intégrations Google et GitHub",
+    "tagline": "Aucun engagement",
+    "tagline_security": "Sécurité Firebase",
+    "tagline_collab": "Collaboration fluide",
+    "footer_copyright": "© {{year}} Taskly. Tous droits réservés.",
+    "footer_links": [
+      {
+        "label": "Se connecter",
+        "href": "/login"
+      },
+      {
+        "label": "S'inscrire",
+        "href": "/register"
+      },
+      {
+        "label": "Dashboard",
+        "href": "/dashboard"
+      }
+    ],
+    "example_board_title": "Board Marketing",
+    "example_board_status": "En cours",
+    "example_tasks_ready": "3 tâches prêtes à être livrées",
+    "why_taskly": "Pourquoi Taskly"
+  },
+  "auth": {
+    "login_title": "Connexion",
+    "login_description": "Connecte-toi avec ton email et ton mot de passe.",
+    "register_title": "Créer un compte",
+    "register_description": "Crée un compte pour accéder à Taskly.",
+    "email_label": "Email",
+    "password_label": "Mot de passe",
+    "password_confirm_label": "Confirmer le mot de passe",
+    "email_placeholder": "you@example.com",
+    "continue_google": "Continuer avec Google",
+    "continue_github": "Continuer avec GitHub",
+    "continue_google_loading": "Connexion Google…",
+    "continue_github_loading": "Connexion GitHub…",
+    "sign_in": "Se connecter",
+    "sign_in_loading": "Connexion…",
+    "no_account": "Pas de compte ?",
+    "create_account": "Créer un compte",
+    "have_account": "Tu as déjà un compte ?",
+    "sign_up": "S'inscrire",
+    "sign_up_loading": "Inscription…",
+    "or": "ou",
+    "error_title": "Connexion impossible",
+    "error_default": "Une erreur est survenue.",
+    "login_link": "Se connecter",
+    "register_link": "S'inscrire"
+  }
+}

@@ -46,6 +46,7 @@ import { getFirebaseAuth } from "@/lib/firebase/firebase-client"
 import { updateProfile } from "firebase/auth"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { getBoardBackgroundStyle } from "@/components/board/board-background"
+import { LanguageSwitcherDark } from "@/components/language-switcher"
 
 /**
  * Formats notification timestamp for display.
@@ -386,6 +387,8 @@ export function Navbar() {
             className="h-8 w-56 bg-[#22272b] border-[#9fadbc29] pl-8 text-[#9fadbc] placeholder:text-[#9fadbc] hover:bg-[#2c333a] focus:bg-white focus:text-black focus:placeholder:text-gray-500 transition-all"
           />
         </div>
+
+        <LanguageSwitcherDark />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -4,6 +4,7 @@
  * Handles user sign in with email and password via Firebase Auth.
  * Auto-redirects authenticated users to dashboard or return URL.
  * Shows error toast on login failure.
+ * Supports multi-language.
  *
  * Features:
  * - Email/password form
@@ -11,6 +12,7 @@
  * - Error handling with toasts
  * - Redirect after successful login
  * - Link to registration page
+ * - Multi-language support
  */
 
 'use client';
@@ -21,6 +23,7 @@ import { useRouter } from 'next/navigation';
 import { Github } from 'lucide-react';
 import { Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, Input, useToast } from '@taskly/ui';
 import { useAuth } from '@/auth/auth-provider';
+import { useTranslation } from '@/lib/i18n';
 
 /**
  * Safely decodes URI component, returning original value on error.
@@ -71,6 +74,7 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, signInWithEmailPassword, signInWithGithub, signInWithGoogle } = useAuth();
+  const { t } = useTranslation();
 
   // Safely decode the next path or default to dashboard
   const redirectTo = safeDecodeURIComponent(nextPath ?? '/dashboard');
@@ -80,11 +84,16 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [oauthSubmitting, setOauthSubmitting] = useState<'google' | 'github' | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Auto-redirect if already authenticated
   useEffect(() => {
     if (!loading && user) router.replace(redirectTo);
   }, [loading, user, router, redirectTo]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /**
    * Handles form submission - authenticates user and redirects.
@@ -100,8 +109,8 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
     } catch (err) {
       // Show error toast on authentication failure
       toast({
-        title: 'Connexion impossible',
-        description: err instanceof Error ? err.message : 'Une erreur est survenue.',
+        title: t('auth.error_title'),
+        description: err instanceof Error ? err.message : t('auth.error_default'),
         variant: 'destructive',
       });
     } finally {
@@ -120,8 +129,8 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
       router.replace(redirectTo);
     } catch (err) {
       toast({
-        title: 'Connexion impossible',
-        description: err instanceof Error ? err.message : 'Une erreur est survenue.',
+        title: t('auth.error_title'),
+        description: err instanceof Error ? err.message : t('auth.error_default'),
         variant: 'destructive',
       });
     } finally {
@@ -129,11 +138,13 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
     }
   }
 
+  if (!mounted) return null;
+
   return (
     <Card className="w-full max-w-md shadow-xl border-[#9fadbc29] bg-[#1d2125] text-[#b6c2cf]">
       <CardHeader>
-        <CardTitle className="text-[#b6c2cf]">Connexion</CardTitle>
-        <CardDescription className="text-[#9fadbc]">Connecte-toi avec ton email et ton mot de passe.</CardDescription>
+        <CardTitle className="text-[#b6c2cf]">{t('auth.login_title')}</CardTitle>
+        <CardDescription className="text-[#9fadbc]">{t('auth.login_description')}</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
@@ -146,7 +157,7 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
               className="w-full justify-center gap-2"
             >
               <GoogleIcon className="h-4 w-4" />
-              {oauthSubmitting === 'google' ? 'Connexion Google…' : 'Continuer avec Google'}
+              {oauthSubmitting === 'google' ? t('auth.continue_google_loading') : t('auth.continue_google')}
             </Button>
             <Button
               type="button"
@@ -156,17 +167,17 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
               className="w-full justify-center gap-2"
             >
               <Github className="h-4 w-4" aria-hidden="true" />
-              {oauthSubmitting === 'github' ? 'Connexion GitHub…' : 'Continuer avec GitHub'}
+              {oauthSubmitting === 'github' ? t('auth.continue_github_loading') : t('auth.continue_github')}
             </Button>
           </div>
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-[#9fadbc29]" />
-            <span className="text-xs uppercase tracking-wide text-[#9fadbc]">ou</span>
+            <span className="text-xs uppercase tracking-wide text-[#9fadbc]">{t('auth.or')}</span>
             <span className="h-px flex-1 bg-[#9fadbc29]" />
           </div>
           <div className="space-y-2">
             <label className="text-sm text-[#9fadbc]" htmlFor="email">
-              Email
+              {t('auth.email_label')}
             </label>
             <Input
               id="email"
@@ -174,7 +185,7 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('auth.email_placeholder')}
               className="bg-[#22272b] border-[#9fadbc29] text-[#b6c2cf] placeholder:text-[#9fadbc]"
               required
             />
@@ -182,7 +193,7 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
 
           <div className="space-y-2">
             <label className="text-sm text-[#9fadbc]" htmlFor="password">
-              Mot de passe
+              {t('auth.password_label')}
             </label>
             <Input
               id="password"
@@ -198,12 +209,12 @@ export function LoginClient({ nextPath }: { nextPath?: string }) {
 
         <CardFooter className="flex flex-col gap-3 items-stretch">
           <Button type="submit" variant="trello" disabled={submitting || oauthSubmitting !== null}>
-            {submitting ? 'Connexion…' : 'Se connecter'}
+            {submitting ? t('auth.sign_in_loading') : t('auth.sign_in')}
           </Button>
           <p className="text-sm text-[#9fadbc]">
-            Pas de compte ?{' '}
+            {t('auth.no_account')}{' '}
             <Link className="text-[#85b8ff] hover:underline" href="/register">
-              Créer un compte
+              {t('auth.create_account')}
             </Link>
           </p>
         </CardFooter>
