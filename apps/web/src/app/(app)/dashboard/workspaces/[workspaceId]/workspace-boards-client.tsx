@@ -6,11 +6,13 @@ import { api } from '@/app/trpc';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input } from '@taskly/ui';
 import { getBoardBackgroundStyle } from '@/components/board/board-background';
+import { useTranslation } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 
 const BOARDS_PER_PAGE = 12;
 
 export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const utils = api.useUtils();
   const { setSelectedWorkspaceId } = useWorkspaceUI();
@@ -40,11 +42,11 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
   const pageBoards = boards.slice(start, start + BOARDS_PER_PAGE);
 
   if (wsQuery.isLoading) {
-    return <div className="p-6 text-[#b6c2cf]">Chargement…</div>;
+    return <div className="p-6 text-[#b6c2cf]">{t('dashboard.loading')}</div>;
   }
 
   if (!wsQuery.data) {
-    return <div className="p-6 text-[#b6c2cf]">Workspace introuvable.</div>;
+    return <div className="p-6 text-[#b6c2cf]">{t('dashboard.workspace_not_found')}</div>;
   }
 
   return (
@@ -62,13 +64,13 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
           <div className="flex items-center gap-2">
             <Dialog open={createBoardOpen} onOpenChange={setCreateBoardOpen}>
               <DialogTrigger asChild>
-                <Button variant="trello">Créer un board</Button>
+                <Button variant="trello">{t('navbar.create_board')}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create board</DialogTitle>
+                  <DialogTitle>{t('navbar.create_board')}</DialogTitle>
                 </DialogHeader>
-                <Input value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} placeholder="Board title" />
+                <Input value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} placeholder={t('board.board_title_placeholder')} />
                 <DialogFooter>
                   <Button
                     variant="trello"
@@ -79,7 +81,7 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
                       setCreateBoardOpen(false);
                     }}
                   >
-                    Créer
+                    {t('actions.create')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -90,9 +92,9 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
 
       <div className="mt-6">
         {boardsQuery.isLoading ? (
-          <div className="text-sm text-[#9fadbc]">Chargement des boards…</div>
+          <div className="text-sm text-[#9fadbc]">{t('dashboard.loading_boards')}</div>
         ) : boards.length === 0 ? (
-          <div className="text-sm text-[#9fadbc]">Aucun board. Crée le premier.</div>
+          <div className="text-sm text-[#9fadbc]">{t('dashboard.no_board')}</div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -102,7 +104,7 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
                     <div className="h-9" style={getBoardBackgroundStyle(b.background, { preferThumb: true })} />
                     <div className="flex-1 p-4 flex flex-col justify-between">
                       <div className="text-sm font-semibold text-[#b6c2cf] group-hover:text-white truncate">{b.title}</div>
-                      <div className="text-xs text-[#9fadbc]">Ouvrir →</div>
+                      <div className="text-xs text-[#9fadbc]">{t('dashboard.open_board')}</div>
                     </div>
                   </div>
                 </Link>
@@ -117,7 +119,7 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
                   disabled={safePage <= 1}
                   onClick={() => setPage(safePage - 1)}
                 >
-                  Précédent
+                  {t('dashboard.previous')}
                 </Button>
                 <div className="text-xs text-[#9fadbc]">
                   Page {safePage} / {totalPages}
@@ -128,7 +130,7 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
                   disabled={safePage >= totalPages}
                   onClick={() => setPage(safePage + 1)}
                 >
-                  Suivant
+                  {t('dashboard.next')}
                 </Button>
               </div>
             )}
@@ -138,5 +140,3 @@ export default function WorkspaceBoardsClient({ workspaceId }: { workspaceId: st
     </div>
   );
 }
-
-

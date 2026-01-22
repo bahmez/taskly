@@ -5,12 +5,13 @@
  * Wraps the entire app with global providers (tRPC, Auth, Toaster).
  * Sets up HTML structure and global styles.
  *
- * Language: French (lang="fr")
+ * Supports multi-language (FR, EN) with i18n.
  */
 
-import type { ReactNode } from 'react';
 import './globals.css';
 import { Providers } from './providers';
+import { RootLayoutClient } from './layout-client';
+import type { ReactNode } from 'react';
 
 /**
  * Root layout for the entire application.
@@ -21,12 +22,9 @@ import { Providers } from './providers';
  */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr">
-      <body>
-        {/* Global providers: tRPC, Auth, Toaster */}
-        <Providers>{children}</Providers>
-      </body>
-    </html>
+    <RootLayoutClient>
+      <Providers>{children}</Providers>
+    </RootLayoutClient>
   );
 }
 

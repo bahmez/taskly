@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { api } from '@/app/trpc';
+import { useTranslation } from '@/lib/i18n';
 import type { BoardBackground } from '@taskly/trpc';
 import { getBoardBackgroundStyle } from '@/components/board/board-background';
 import {
@@ -370,6 +371,7 @@ function SortableBoardColumn({
   initialsForUser: (userId: string) => string;
   userById: Map<string, { id: string }>;
 }) {
+  const { t } = useTranslation();
   const { setNodeRef: setDropRef } = useDroppable({
     id: dndColumnDropId(col.id),
     data: { type: 'column-drop' satisfies DndItemType, columnId: col.id },
@@ -450,21 +452,21 @@ function SortableBoardColumn({
             </DialogTrigger>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
               <DialogHeader>
-                <DialogTitle>Column settings</DialogTitle>
+                <DialogTitle>{t('board.column_settings')}</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-2">
-                <div className="text-sm text-[#9fadbc]">Title</div>
-                <Input value={settingsTitleDraft} onChange={(e) => setSettingsTitleDraft(e.target.value)} placeholder="Column title" />
+                <div className="text-sm text-[#9fadbc]">{t('board.column_title_label')}</div>
+                <Input value={settingsTitleDraft} onChange={(e) => setSettingsTitleDraft(e.target.value)} placeholder={t('board.column_title_placeholder')} />
               </div>
 
               <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
                 <Button variant="destructive" disabled={removeColumn.isPending} onClick={onRequestDelete}>
-                  Delete column
+                  {t('board.delete_column')}
                 </Button>
 
                 <Button variant="trello" disabled={!settingsTitleDraft.trim() || updateColumn.isPending} onClick={onSaveSettingsTitle}>
-                  Save
+                  {t('actions.save')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -473,11 +475,11 @@ function SortableBoardColumn({
       </div>
 
       <div ref={setDropRef} className="px-3 pb-3 pt-3 flex-1 overflow-y-auto space-y-3 min-h-6">
-        <SortableContext items={colTickets.map((t) => dndTicketId(t.id))} strategy={verticalListSortingStrategy}>
-          {colTickets.map((t) => (
+        <SortableContext items={colTickets.map((ticket) => dndTicketId(ticket.id))} strategy={verticalListSortingStrategy}>
+          {colTickets.map((ticket) => (
             <SortableBoardTicket
-              key={t.id}
-              t={t}
+              key={ticket.id}
+              t={ticket}
               labelMap={labelMap}
               onOpen={onOpenTicket}
               formatUserPrimary={formatUserPrimary}
@@ -496,20 +498,20 @@ function SortableBoardColumn({
             type="button"
           >
             <Plus className="h-4 w-4" />
-            Add a card
+            {t('board.add_a_card')}
           </button>
         </DialogTrigger>
         <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
           <DialogHeader>
-            <DialogTitle>Add card</DialogTitle>
+            <DialogTitle>{t('board.add_card_dialog')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Input value={newTitle} onChange={(e) => onChangeNewTitle(e.target.value)} placeholder="Card title" />
-            <Textarea value={newDesc} onChange={(e) => onChangeNewDesc(e.target.value)} placeholder="Description (optional)" />
+            <Input value={newTitle} onChange={(e) => onChangeNewTitle(e.target.value)} placeholder={t('board.card_title_placeholder')} />
+            <Textarea value={newDesc} onChange={(e) => onChangeNewDesc(e.target.value)} placeholder={t('board.description_placeholder')} />
           </div>
           <DialogFooter>
             <Button variant="trello" disabled={!newTitle.trim() || createTicket.isPending} onClick={onAddCard}>
-              Add
+              {t('actions.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -519,6 +521,7 @@ function SortableBoardColumn({
 }
 
 export default function BoardClient({ boardId }: { boardId: string }) {
+  const { t } = useTranslation();
   const utils = api.useUtils();
   const { setSelectedWorkspaceId } = useWorkspaceUI();
   const { toast } = useToast();
@@ -558,49 +561,49 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot update board', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const createColumn = api.boards.columns.create.useMutation({
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot create column', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const updateColumn = api.boards.columns.update.useMutation({
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot update column', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const removeColumn = api.boards.columns.remove.useMutation({
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot remove column', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const reorderColumns = api.boards.columns.reorder.useMutation({
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot reorder columns', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const createTicket = api.boards.tickets.create.useMutation({
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot create ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const moveTicket = api.boards.tickets.move.useMutation({
     onSuccess: async () => {
       await utils.boards.view.invalidate({ boardId });
     },
-    onError: (e) => toast({ title: 'Cannot move ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.action_failed'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const [newColumnTitle, setNewColumnTitle] = React.useState('');
@@ -861,8 +864,8 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     (columnId: string) => {
       setConfirmDialog({
         open: true,
-        title: 'Delete column',
-        description: 'Delete this column? Tickets in this column may be affected.',
+        title: t('board.delete_column'),
+        description: t('board.delete_column'),
         onConfirm: () => {
           removeColumn.mutate(
             { boardId, columnId },
@@ -875,15 +878,15 @@ export default function BoardClient({ boardId }: { boardId: string }) {
         },
       });
     },
-    [boardId, removeColumn],
+    [boardId, removeColumn, t],
   );
 
   // IMPORTANT: keep conditional returns AFTER all hooks to avoid "Rendered more hooks than during the previous render"
   if (viewQuery.isLoading) {
-    return <div className="p-6 text-[#b6c2cf]">Loading…</div>;
+    return <div className="p-6 text-[#b6c2cf]">{t('navbar.loading')}</div>;
   }
   if (!viewQuery.data || !board) {
-    return <div className="p-6 text-[#b6c2cf]">Board not found.</div>;
+    return <div className="p-6 text-[#b6c2cf]">{t('board.not_found')}</div>;
   }
 
   const currentBackground = board.background ?? null;
@@ -940,12 +943,12 @@ export default function BoardClient({ boardId }: { boardId: string }) {
             <DialogTrigger asChild>
               <Button variant="ghost" className="gap-2" disabled={!canEditBackground}>
                 <Paintbrush className="h-4 w-4" />
-                Background
+                {t('board.background')}
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Board background</DialogTitle>
+                <DialogTitle>{t('board.board_background')}</DialogTitle>
               </DialogHeader>
               <div className="flex flex-wrap items-center gap-2">
                 {(['color', 'gradient', 'image'] as const).map((tab) => (
@@ -959,7 +962,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                     )}
                     onClick={() => setBackgroundTab(tab)}
                   >
-                    {tab === 'image' ? 'Images' : tab === 'gradient' ? 'Gradients' : 'Colors'}
+                    {tab === 'image' ? t('board.images') : tab === 'gradient' ? t('board.gradients') : t('board.colors')}
                   </Button>
                 ))}
                 <Button
@@ -972,7 +975,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                   }}
                   disabled={updateBoard.isPending}
                 >
-                  Remove
+                  {t('board.remove')}
                 </Button>
               </div>
 
@@ -980,14 +983,14 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                 <Input
                   value={imageSearch}
                   onChange={(e) => setImageSearch(e.target.value)}
-                  placeholder="Search Unsplash"
+                  placeholder={t('navbar.search_placeholder')}
                 />
               )}
 
               {backgroundsQuery.isLoading ? (
-                <div className="text-sm text-[#9fadbc]">Loading backgrounds…</div>
+                <div className="text-sm text-[#9fadbc]">{t('navbar.loading_backgrounds')}</div>
               ) : backgroundItems.length === 0 ? (
-                <div className="text-sm text-[#9fadbc]">No background found.</div>
+                <div className="text-sm text-[#9fadbc]">{t('navbar.no_background_found')}</div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                   {backgroundItems.map((bg) => {
@@ -1022,7 +1025,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                     onClick={() => backgroundsQuery.fetchNextPage()}
                     disabled={backgroundsQuery.isFetchingNextPage}
                   >
-                    {backgroundsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                    {backgroundsQuery.isFetchingNextPage ? t('navbar.loading') : t('navbar.load_more')}
                   </Button>
                 </div>
               )}
@@ -1032,15 +1035,15 @@ export default function BoardClient({ boardId }: { boardId: string }) {
           <Dialog open={boardActivityOpen} onOpenChange={setBoardActivityOpen}>
             <Button variant="ghost" className="gap-2" onClick={() => setBoardActivityOpen(true)}>
               <ScrollText className="h-4 w-4" />
-              Activity
+              {t('board.board_activity')}
             </Button>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Board activity</DialogTitle>
+                <DialogTitle>{t('board.board_activity')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
                 {boardActivityItems.length === 0 ? (
-                  <div className="text-sm text-[#9fadbc]">No activity yet.</div>
+                  <div className="text-sm text-[#9fadbc]">{t('board.no_activity_yet')}</div>
                 ) : (
                   boardActivityItems.map((it) => {
                     const ticketTitle = it.ticketId ? ticketsState.find((t) => t.id === it.ticketId)?.title ?? null : null;
@@ -1067,7 +1070,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                                     setOpenedTicketId(it.ticketId!);
                                   }}
                                 >
-                                  Open ticket
+                                  {t('board.open_ticket')}
                                 </button>
                               </>
                             ) : null}
@@ -1083,13 +1086,13 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="trello">Add column</Button>
+              <Button variant="trello">{t('board.add_column')}</Button>
             </DialogTrigger>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
               <DialogHeader>
-                <DialogTitle>Create column</DialogTitle>
+                <DialogTitle>{t('board.create_column_dialog')}</DialogTitle>
               </DialogHeader>
-              <Input value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} placeholder="Column title" />
+              <Input value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} placeholder={t('board.column_placeholder')} />
               <DialogFooter>
                 <Button
                   variant="trello"
@@ -1099,7 +1102,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                     setNewColumnTitle('');
                   }}
                 >
-                  Create
+                  {t('actions.create')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1226,7 +1229,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
         title={confirmDialog.title}
         description={confirmDialog.description}
         variant="destructive"
-        confirmText="Delete"
+        confirmText={t('actions.delete')}
         onConfirm={confirmDialog.onConfirm}
       />
     </div>

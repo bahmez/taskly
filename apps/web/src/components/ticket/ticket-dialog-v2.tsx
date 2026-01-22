@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api } from '@/app/trpc';
+import { useTranslation } from '@/lib/i18n';
 import {
   Button,
   Dialog,
@@ -108,6 +109,7 @@ function formatDateTime(iso: string): string {
 }
 
 export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }: TicketDialogProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const utils = api.useUtils();
   const activityListInput = React.useMemo(() => ({ ticketId, limit: 30, cursor: null as string | null }), [ticketId]);
@@ -428,18 +430,18 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         utils.tickets.get.invalidate({ ticketId }),
         utils.boards.view.invalidate({ boardId }),
       ]);
-      toast({ title: 'Ticket updated' });
+      toast({ title: t('ticket.ticket_updated') });
     },
     onError: (e) => {
       const msg = trpcErrorMessage(e);
       if (msg.includes('mention') || msg.includes('Invalid')) {
         toast({ 
-          title: 'Invalid mention', 
-          description: 'One or more mentioned users are not members of this workspace.',
+          title: t('toast.invalid_mention'), 
+          description: t('toast.invalid_mention_desc'),
           variant: 'destructive' 
         });
       } else {
-        toast({ title: 'Update failed', description: msg, variant: 'destructive' });
+        toast({ title: t('toast.update_failed'), description: msg, variant: 'destructive' });
       }
     },
   });
@@ -449,18 +451,18 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       await Promise.all([utils.tickets.comments.list.invalidate({ ticketId }), utils.tickets.activity.list.invalidate(activityListInput)]);
       setNewComment('');
       newCommentRef.current = '';
-      toast({ title: 'Comment added' });
+      toast({ title: t('toast.comment_added') });
     },
     onError: (e) => {
       const msg = trpcErrorMessage(e);
       if (msg.includes('mention') || msg.includes('Invalid')) {
         toast({ 
-          title: 'Invalid mention', 
-          description: 'One or more mentioned users are not members of this workspace.',
+          title: t('toast.invalid_mention'), 
+          description: t('toast.invalid_mention_desc'),
           variant: 'destructive' 
         });
       } else {
-        toast({ title: 'Failed to add comment', description: msg, variant: 'destructive' });
+        toast({ title: t('toast.failed_to_add_comment'), description: msg, variant: 'destructive' });
       }
     },
   });
@@ -471,10 +473,10 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         utils.tickets.assignees.list.invalidate({ ticketId }),
         utils.tickets.get.invalidate({ ticketId }),
       ]);
-      toast({ title: 'Member added' });
+      toast({ title: t('toast.member_added') });
     },
     onError: (e) => {
-      toast({ title: 'Failed to add member', description: trpcErrorMessage(e), variant: 'destructive' });
+      toast({ title: t('toast.failed_to_add_member'), description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -484,7 +486,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         utils.tickets.assignees.list.invalidate({ ticketId }),
         utils.tickets.get.invalidate({ ticketId }),
       ]);
-      toast({ title: 'Member removed' });
+      toast({ title: t('toast.member_removed') });
     },
   });
 
@@ -495,7 +497,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         utils.tickets.get.invalidate({ ticketId }),
         utils.boards.view.invalidate({ boardId }),
       ]);
-      toast({ title: 'Label added' });
+      toast({ title: t('toast.label_added') });
     },
   });
 
@@ -506,7 +508,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         utils.tickets.get.invalidate({ ticketId }),
         utils.boards.view.invalidate({ boardId }),
       ]);
-      toast({ title: 'Label removed' });
+      toast({ title: t('toast.label_removed') });
     },
   });
 
@@ -517,17 +519,17 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
       addLabel.mutate({ ticketId, labelId: newLabel.id });
     },
     onError: (e) => {
-      toast({ title: 'Failed to create label', description: trpcErrorMessage(e), variant: 'destructive' });
+      toast({ title: t('toast.failed_to_create_label'), description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
   const updateBoardLabel = api.boards.labels.update.useMutation({
     onSuccess: async () => {
       await Promise.all([utils.boards.labels.list.invalidate({ boardId }), utils.boards.view.invalidate({ boardId })]);
-      toast({ title: 'Label updated' });
+      toast({ title: t('toast.label_updated') });
     },
     onError: (e) => {
-      toast({ title: 'Failed to update label', description: trpcErrorMessage(e), variant: 'destructive' });
+      toast({ title: t('toast.failed_to_update_label'), description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
@@ -538,17 +540,17 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
         utils.boards.view.invalidate({ boardId }),
         utils.tickets.labels.list.invalidate({ ticketId }),
       ]);
-      toast({ title: 'Label deleted' });
+      toast({ title: t('toast.label_deleted') });
     },
     onError: (e) => {
-      toast({ title: 'Failed to delete label', description: trpcErrorMessage(e), variant: 'destructive' });
+      toast({ title: t('toast.failed_to_delete_label'), description: trpcErrorMessage(e), variant: 'destructive' });
     },
   });
 
   const createChecklist = api.tickets.checklists.create.useMutation({
     onSuccess: async () => {
       await utils.tickets.checklists.list.invalidate({ ticketId });
-      toast({ title: 'Checklist created' });
+      toast({ title: t('toast.checklist_created') });
     },
   });
 
@@ -561,7 +563,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const deleteChecklist = api.tickets.checklists.remove.useMutation({
     onSuccess: async () => {
       await utils.tickets.checklists.list.invalidate({ ticketId });
-      toast({ title: 'Checklist deleted' });
+      toast({ title: t('toast.checklist_deleted') });
     },
   });
 
@@ -576,47 +578,47 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const completeAttachment = api.tickets.attachments.complete.useMutation({
     onSuccess: async () => {
       await utils.tickets.attachments.list.invalidate({ ticketId });
-      toast({ title: 'File uploaded' });
+      toast({ title: t('toast.file_uploaded') });
     },
   });
 
   const deleteAttachment = api.tickets.attachments.remove.useMutation({
     onSuccess: async () => {
       await utils.tickets.attachments.list.invalidate({ ticketId });
-      toast({ title: 'Attachment deleted' });
+      toast({ title: t('toast.attachment_deleted') });
     },
   });
 
   const createReminder = api.tickets.reminders.create.useMutation({
     onSuccess: async () => {
       await utils.tickets.reminders.list.invalidate({ ticketId });
-      toast({ title: 'Reminder created' });
+      toast({ title: t('toast.reminder_created') });
     },
-    onError: (e) => toast({ title: 'Failed to create reminder', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.failed_to_create_reminder'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const removeReminder = api.tickets.reminders.remove.useMutation({
     onSuccess: async () => {
       await utils.tickets.reminders.list.invalidate({ ticketId });
-      toast({ title: 'Reminder removed' });
+      toast({ title: t('toast.reminder_removed') });
     },
-    onError: (e) => toast({ title: 'Failed to remove reminder', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.failed_to_remove_reminder'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const watchTicket = api.tickets.watch.watch.useMutation({
     onSuccess: async () => {
       await utils.tickets.watch.get.invalidate({ ticketId });
-      toast({ title: 'Watching this ticket' });
+      toast({ title: t('toast.watching_ticket') });
     },
-    onError: (e) => toast({ title: 'Failed to watch ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.failed_to_watch'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const unwatchTicket = api.tickets.watch.unwatch.useMutation({
     onSuccess: async () => {
       await utils.tickets.watch.get.invalidate({ ticketId });
-      toast({ title: 'Unwatched this ticket' });
+      toast({ title: t('toast.unwatched_ticket') });
     },
-    onError: (e) => toast({ title: 'Failed to unwatch ticket', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.failed_to_unwatch'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   // Local state
@@ -681,7 +683,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl">
-          <div className="p-8 text-[#9fadbc] text-center">Loading ticket...</div>
+          <div className="p-8 text-[#9fadbc] text-center">{t('board.loading_ticket')}</div>
         </DialogContent>
       </Dialog>
     );
@@ -742,7 +744,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <Tag className="h-5 w-5 text-[#9fadbc]" />
-                    <h3 className="text-sm font-semibold text-[#b6c2cf]">Labels</h3>
+                    <h3 className="text-sm font-semibold text-[#b6c2cf]">{t('ticket.labels')}</h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {boardLabels
@@ -763,7 +765,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <Edit3 className="h-5 w-5 text-[#9fadbc]" />
-                  <h3 className="text-sm font-semibold text-[#b6c2cf]">Description</h3>
+                  <h3 className="text-sm font-semibold text-[#b6c2cf]">{t('ticket.description')}</h3>
                   {!isEditingDescription && canEdit && (
                     <Button
                       size="sm"
@@ -772,7 +774,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       className="ml-auto"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
-                      Edit
+                      {t('ticket.edit')}
                     </Button>
                   )}
                 </div>
@@ -850,7 +852,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           setIsEditingDescription(false);
                         }}
                       >
-                        Save
+                        {t('ticket.save')}
                       </Button>
                       <Button
                         size="sm"
@@ -861,7 +863,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           setIsEditingDescription(false);
                         }}
                       >
-                        Cancel
+                        {t('ticket.cancel')}
                       </Button>
                     </div>
                   </div>
@@ -878,7 +880,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         {linkifyMentionsMarkdown(ticket.description)}
                       </ReactMarkdown>
                     ) : (
-                      'Add a more detailed description...'
+                      t('ticket.add_detailed_description')
                     )}
                   </div>
                 )}
@@ -889,7 +891,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <CheckSquare className="h-5 w-5 text-[#9fadbc]" />
-                    <h3 className="text-sm font-semibold text-[#b6c2cf]">Checklists</h3>
+                    <h3 className="text-sm font-semibold text-[#b6c2cf]">{t('ticket.checklists')}</h3>
                   </div>
                   <div className="space-y-5">
                     {checklistsQuery.data.map((cl) => {
@@ -903,7 +905,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                             <div>
                               <div className="text-sm font-semibold">{cl.title}</div>
                               <div className="text-xs text-[#9fadbc] mt-1">
-                                {completed}/{total} completed
+                                {completed}/{total} {t('ticket.completed')}
                               </div>
                             </div>
                             {canEdit && (
@@ -913,8 +915,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                                 onClick={() => {
                                   setConfirmDialog({
                                     open: true,
-                                    title: 'Delete checklist',
-                                    description: `Are you sure you want to delete "${cl.title}"?`,
+                                    title: t('ticket.delete_checklist_title'),
+                                    description: t('ticket.delete_checklist_confirm', { name: cl.title }),
                                     onConfirm: () => deleteChecklist.mutate({ ticketId, checklistId: cl.id }),
                                   });
                                 }}
@@ -963,7 +965,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           {canEdit && (
                             <div className="mt-3 flex gap-2">
                               <Input
-                                placeholder="Add an item..."
+                                placeholder={t('ticket.add_item_placeholder')}
                                 value={newChecklistItemContent[cl.id] ?? ''}
                                 onChange={(e) =>
                                   setNewChecklistItemContent((s) => ({ ...s, [cl.id]: e.target.value }))
@@ -994,7 +996,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <Paperclip className="h-5 w-5 text-[#9fadbc]" />
-                    <h3 className="text-sm font-semibold text-[#b6c2cf]">Attachments</h3>
+                    <h3 className="text-sm font-semibold text-[#b6c2cf]">{t('ticket.attachments')}</h3>
                   </div>
                   <div className="space-y-3">
                     {attachmentsQuery.data.map((att) => (
@@ -1005,7 +1007,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate">{att.filename}</div>
                           <div className="text-xs text-[#9fadbc] mt-1">
-                            {att.size ? `${Math.round(att.size / 1024)} KB` : 'Pending'} • {new Date(att.createdAt).toLocaleDateString()}
+                            {att.size ? `${Math.round(att.size / 1024)} KB` : t('ticket.pending')} • {new Date(att.createdAt).toLocaleDateString()}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -1018,13 +1020,13 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                                 const res = await utils.tickets.attachments.download.fetch({ ticketId, attachmentId: att.id });
                                 window.open(res.download.url, '_blank');
                               } catch (e) {
-                                toast({ title: 'Download failed', variant: 'destructive' });
+                                toast({ title: t('toast.download_failed'), variant: 'destructive' });
                               }
                             }}
                             className="gap-2"
                           >
                             <Download className="h-4 w-4" />
-                            Download
+                            {t('ticket.download')}
                           </Button>
                           {canEdit && (
                             <Button
@@ -1033,8 +1035,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                               onClick={() => {
                                 setConfirmDialog({
                                   open: true,
-                                  title: 'Delete attachment',
-                                  description: `Delete "${att.filename}"?`,
+                                  title: t('ticket.delete_attachment_title'),
+                                  description: t('ticket.delete_attachment_confirm', { filename: att.filename }),
                                   onConfirm: () => deleteAttachment.mutate({ ticketId, attachmentId: att.id }),
                                 });
                               }}
@@ -1054,7 +1056,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <div className="flex items-center gap-3 mb-4">
                   <MessageSquare className="h-5 w-5 text-[#9fadbc]" />
                   <h3 className="text-sm font-semibold text-[#b6c2cf]">
-                    {ticketFeedView === 'history' ? 'Activity' : 'Comments'}
+                    {ticketFeedView === 'history' ? t('ticket.activity_tab') : t('ticket.comments_tab')}
                   </h3>
                   <div className="ml-auto flex items-center gap-2">
                     <Button
@@ -1062,14 +1064,14 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       variant={ticketFeedView === 'comments' ? 'trello' : 'ghost'}
                       onClick={() => setTicketFeedView('comments')}
                     >
-                      Comments
+                      {t('ticket.comments_tab')}
                     </Button>
                     <Button
                       size="sm"
                       variant={ticketFeedView === 'history' ? 'trello' : 'ghost'}
                       onClick={() => setTicketFeedView('history')}
                     >
-                      History
+                      {t('ticket.history_tab')}
                     </Button>
                   </div>
                 </div>
@@ -1111,7 +1113,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           onBlur={() => {
                             setTimeout(() => closeCommentMentions(), 150);
                           }}
-                          placeholder="Write a comment..."
+                          placeholder={t('ticket.write_comment_placeholder')}
                           className="min-h-[80px] bg-[#282e33] border-[#9fadbc29]"
                         />
                         <MentionDropdown
@@ -1128,7 +1130,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                             onClick={() => addComment.mutate({ ticketId, content: newComment.trim() })}
                             disabled={addComment.isPending}
                           >
-                            Save
+                            {t('ticket.save')}
                           </Button>
                         )}
                       </div>
@@ -1157,10 +1159,10 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                   {ticketFeedView === 'history' && (
                     <div className="space-y-2">
                       {ticketActivity.length === 0 ? (
-                        <div className="text-xs text-[#9fadbc]">No activity yet.</div>
+                        <div className="text-xs text-[#9fadbc]">{t('ticket.no_activity')}</div>
                       ) : (
                         ticketActivity.map((a) => {
-                          const actor = a.actorId ? formatUserPrimary(a.actorId) : 'System';
+                          const actor = a.actorId ? formatUserPrimary(a.actorId) : t('ticket.system');
                           const data = a.data as Record<string, unknown>;
                           const userId = typeof data?.userId === 'string' ? data.userId : null;
                           const labelId = typeof data?.labelId === 'string' ? data.labelId : null;
@@ -1168,19 +1170,19 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                           let label: string = a.type;
                           switch (a.type) {
                             case 'ticket_created':
-                              label = 'Ticket created';
+                              label = t('ticket.ticket_created');
                               break;
                             case 'ticket_updated':
-                              label = 'Ticket updated';
+                              label = t('ticket.ticket_updated');
                               break;
                             case 'ticket_moved':
-                              label = 'Ticket moved';
+                              label = t('board.card_moved');
                               break;
                             case 'ticket_archived':
                               label = 'Ticket archived';
                               break;
                             case 'ticket_comment_added':
-                              label = 'Comment added';
+                              label = t('toast.comment_added');
                               break;
                             case 'ticket_comment_updated':
                               label = 'Comment updated';
@@ -1258,7 +1260,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
             <div className="w-full lg:w-56 shrink-0 space-y-6">
               {/* Due date */}
               <div>
-                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Due date</div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">{t('ticket.due_date')}</div>
                 <div className="space-y-2">
                   {dueDateIso ? (
                     <div
@@ -1272,22 +1274,22 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         <div className={cn('text-xs font-semibold truncate', isOverdue ? 'text-red-200' : 'text-[#b6c2cf]')}>
                           {formatDateTime(dueDateIso)}
                         </div>
-                        <div className="text-[11px] text-[#9fadbc]">{isOverdue ? 'Overdue' : 'Due'}</div>
+                        <div className="text-[11px] text-[#9fadbc]">{isOverdue ? t('ticket.overdue') : t('ticket.due')}</div>
                       </div>
                       {canEdit && (
                         <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setDueDateModalOpen(true)}>
-                          Edit
+                          {t('ticket.edit')}
                         </Button>
                       )}
                     </div>
                   ) : (
-                    <div className="text-xs text-[#9fadbc]">No due date.</div>
+                    <div className="text-xs text-[#9fadbc]">{t('ticket.no_due_date')}</div>
                   )}
 
                   {canEdit && (
                     <Button size="sm" variant="ghost" className="w-full justify-start h-9" onClick={() => setDueDateModalOpen(true)}>
                       <Calendar className="h-4 w-4 mr-3" />
-                      {dueDateIso ? 'Change due date' : 'Set due date'}
+                      {dueDateIso ? t('ticket.change_due_date') : t('ticket.set_due_date')}
                     </Button>
                   )}
                 </div>
@@ -1297,7 +1299,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
               {/* Watch / Unwatch */}
               <div>
-                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Notifications</div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">{t('ticket.notifications_section')}</div>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1306,7 +1308,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                   onClick={() => (isWatching ? unwatchTicket.mutate({ ticketId }) : watchTicket.mutate({ ticketId }))}
                 >
                   <Bell className={cn('h-4 w-4 mr-3', isWatching ? 'text-[#0c66e4]' : 'text-[#9fadbc]')} />
-                  {isWatching ? 'Unwatch' : 'Watch'}
+                  {isWatching ? t('ticket.unwatch') : t('ticket.watch')}
                 </Button>
               </div>
 
@@ -1314,7 +1316,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
               {/* Reminders */}
               <div>
-                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Reminders</div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">{t('ticket.reminders_section')}</div>
                 <div className="space-y-3">
                   {/* List */}
                   {reminders.length > 0 ? (
@@ -1332,7 +1334,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                                 {formatDateTime(r.remindAt)}
                               </div>
                               <div className="text-[11px] text-[#9fadbc]">
-                                {isSent ? `Sent ${formatDateTime(r.sentAt!)}` : 'Pending'}
+                                {isSent ? `Sent ${formatDateTime(r.sentAt!)}` : t('ticket.pending')}
                               </div>
                             </div>
                             <Button
@@ -1350,7 +1352,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       })}
                     </div>
                   ) : (
-                    <div className="text-xs text-[#9fadbc]">No reminders yet.</div>
+                    <div className="text-xs text-[#9fadbc]">{t('ticket.no_reminders')}</div>
                   )}
 
                   <Button
@@ -1361,7 +1363,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     onClick={() => setReminderModalOpen(true)}
                   >
                     <Bell className="h-4 w-4 mr-3" />
-                    Add reminder
+                    {t('ticket.add_reminder_btn')}
                   </Button>
                 </div>
               </div>
@@ -1370,7 +1372,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
               {/* Add to card */}
               <div>
-                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Add to card</div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">{t('ticket.add_to_card')}</div>
                 <div className="space-y-2">
                   {canAssign && (
                     <Button
@@ -1380,7 +1382,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       onClick={() => setMemberSelectOpen(true)}
                     >
                       <User className="h-4 w-4 mr-3" />
-                      Members
+                      {t('ticket.members_button')}
                     </Button>
                   )}
                   {canEdit && (
@@ -1392,7 +1394,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         onClick={() => setLabelManagerOpen(true)}
                       >
                         <Tag className="h-4 w-4 mr-3" />
-                        Labels
+                        {t('ticket.labels_button')}
                       </Button>
                       <Button
                         size="sm"
@@ -1401,14 +1403,14 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         onClick={() => {
                           setPromptDialog({
                             open: true,
-                            title: 'Create checklist',
-                            placeholder: 'Checklist title',
+                            title: t('ticket.create_checklist_dialog'),
+                            placeholder: t('ticket.checklist_title_placeholder'),
                             onConfirm: (title) => createChecklist.mutate({ ticketId, title }),
                           });
                         }}
                       >
                         <CheckSquare className="h-4 w-4 mr-3" />
-                        Checklist
+                        {t('ticket.checklist_button')}
                       </Button>
                       <Button
                         size="sm"
@@ -1424,7 +1426,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                             let createdAttachmentId: string | null = null;
                             let putSucceeded = false;
                             try {
-                              toast({ title: 'Uploading...' });
+                              toast({ title: t('toast.uploading') });
                               const res = await uploadAttachment.mutateAsync({
                                 ticketId,
                                 filename: file.name,
@@ -1465,9 +1467,9 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                                 }
                               }
                               toast({
-                                title: 'Upload failed',
+                                title: t('toast.upload_failed'),
                                 description: error.message.includes('client_email')
-                                  ? 'GCS credentials not configured'
+                                  ? t('navbar.gcs_credentials_not_configured')
                                   : error.message ||
                                     'Failed to upload file. If you see a CORS error in the console, update bucket CORS for your origin.',
                                 variant: 'destructive',
@@ -1478,7 +1480,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                         }}
                       >
                         <Paperclip className="h-4 w-4 mr-3" />
-                        Attachment
+                        {t('ticket.attachment_button')}
                       </Button>
                     </>
                   )}
@@ -1489,7 +1491,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
               {/* Assignees */}
               <div>
-                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">Members</div>
+                <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">{t('ticket.members_section')}</div>
                 <div className="flex flex-wrap gap-2">
                   {assigneesDetailsQuery.data?.map((u) => (
                     <div key={u.id} className="relative group">
@@ -1581,7 +1583,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Calendar className="h-5 w-5 text-[#9fadbc]" />
-              <div className="text-sm font-semibold">Set due date</div>
+              <div className="text-sm font-semibold">{t('ticket.set_due_date')}</div>
             </div>
             <Input
               type="datetime-local"
@@ -1601,11 +1603,11 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     updateTicket.mutate({ ticketId, dueDate: iso });
                     setDueDateModalOpen(false);
                   } catch {
-                    toast({ title: 'Invalid date', variant: 'destructive' });
+                    toast({ title: t('toast.invalid_date'), variant: 'destructive' });
                   }
                 }}
               >
-                Save
+                {t('actions.save')}
               </Button>
               <Button
                 variant="ghost"
@@ -1616,7 +1618,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                   setDueDateModalOpen(false);
                 }}
               >
-                Clear
+                {t('actions.close')}
               </Button>
             </div>
             {dueDateIso && <div className="text-xs text-[#9fadbc]">Current: {formatDateTime(dueDateIso)}</div>}
@@ -1630,7 +1632,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Bell className="h-5 w-5 text-[#9fadbc]" />
-              <div className="text-sm font-semibold">Add reminder</div>
+              <div className="text-sm font-semibold">{t('ticket.add_to_card')}</div>
             </div>
             <Input
               type="datetime-local"
@@ -1651,21 +1653,21 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     setReminderDraft('');
                     setReminderModalOpen(false);
                   } catch {
-                    toast({ title: 'Invalid reminder date', variant: 'destructive' });
+                    toast({ title: t('toast.invalid_date'), variant: 'destructive' });
                   }
                 }}
               >
-                Create
+                {t('actions.create')}
               </Button>
               <Button variant="ghost" onClick={() => setReminderModalOpen(false)} disabled={createReminder.isPending}>
-                Cancel
+                {t('actions.cancel')}
               </Button>
             </div>
 
             <Separator className="bg-[#9fadbc29]" />
 
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-[#9fadbc] uppercase tracking-wide">Presets</div>
+              <div className="text-xs font-semibold text-[#9fadbc] uppercase tracking-wide">{t('ticket.presets')}</div>
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -1680,7 +1682,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     setReminderModalOpen(false);
                   }}
                 >
-                  1h before due
+                  {t('ticket.one_hour_before')}
                 </Button>
                 <Button
                   size="sm"
@@ -1695,10 +1697,10 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                     setReminderModalOpen(false);
                   }}
                 >
-                  1d before due
+                  {t('ticket.one_day_before')}
                 </Button>
               </div>
-              {!ticket.dueDate && <div className="text-xs text-[#9fadbc]">Set a due date to use presets.</div>}
+              {!ticket.dueDate && <div className="text-xs text-[#9fadbc]">{t('ticket.set_due_date_for_presets')}</div>}
             </div>
           </div>
         </DialogContent>

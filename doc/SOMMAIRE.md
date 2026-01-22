@@ -10,7 +10,7 @@
 
 ---
 
-## 📚 Les 6 Documents
+## 📚 Les Documents
 
 | # | Document | Durée | Public |
 |---|----------|-------|--------|
@@ -20,6 +20,8 @@
 | 3️⃣ | **[03_SYSTEME_PERMISSIONS.md](./03_SYSTEME_PERMISSIONS.md)** | 20 min | Backend/Sécurité |
 | 4️⃣ | **[04_GESTION_TICKETS.md](./04_GESTION_TICKETS.md)** | 30 min | Frontend/Backend |
 | 5️⃣ | **[05_WORKFLOWS_COLLABORATIONS.md](./05_WORKFLOWS_COLLABORATIONS.md)** | 25 min | Frontend/Tout |
+| 6️⃣ | **[06_FUTURES_TACHES.md](./06_FUTURES_TACHES.md)** | 10 min | Tous |
+| 7️⃣ | **[07_RECHERCHE_GLOBALE.md](./07_RECHERCHE_GLOBALE.md)** | 10 min | Frontend/Backend |
 | 📝 | **[CONTRIBUTION_GUIDELINES.md](./CONTRIBUTION_GUIDELINES.md)** | 15 min | Développeurs |
 | 🗂️ | **[INDEX.md](./INDEX.md)** | - | Navigation |
 
@@ -114,6 +116,9 @@ CONTRIBUTION_GUIDELINES.md (testing)
 **"Comment les utilisateurs collaborent ?"**
 → [05_WORKFLOWS_COLLABORATIONS.md](./05_WORKFLOWS_COLLABORATIONS.md)
 
+**"Comment fonctionne la recherche ?"**
+→ [07_RECHERCHE_GLOBALE.md](./07_RECHERCHE_GLOBALE.md)
+
 **"Comment je contribue ?"**
 → [CONTRIBUTION_GUIDELINES.md](./CONTRIBUTION_GUIDELINES.md)
 
@@ -132,6 +137,8 @@ doc/
 ├── 03_SYSTEME_PERMISSIONS.md      ← Permissions & Sécurité
 ├── 04_GESTION_TICKETS.md          ← Tickets & Opérations
 ├── 05_WORKFLOWS_COLLABORATIONS.md ← Collaboration
+├── 06_FUTURES_TACHES.md           ← Tâches à venir
+├── 07_RECHERCHE_GLOBALE.md        ← Recherche globale
 │
 ├── CONTRIBUTION_GUIDELINES.md     ← Comment contribuer
 ├── Cahier_des_charges_complet_Taskly.md  ← Specs du projet
