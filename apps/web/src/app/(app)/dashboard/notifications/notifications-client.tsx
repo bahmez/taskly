@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/app/trpc';
 import { Button, Card, CardContent } from '@taskly/ui';
+import { useTranslation } from '@/lib/i18n';
 
 const PAGE_SIZE = 20;
 
@@ -15,6 +16,7 @@ function formatNotificationTime(input: { createdAt?: string; createdAtMs?: numbe
 }
 
 export default function NotificationsClient() {
+  const { t } = useTranslation();
   const router = useRouter();
   const utils = api.useUtils();
 
@@ -63,9 +65,9 @@ export default function NotificationsClient() {
     <div className="p-6 text-[#b6c2cf]">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Notifications</h1>
+          <h1 className="text-2xl font-semibold">{t('navbar.notifications')}</h1>
           <p className="mt-1 text-sm text-[#9fadbc]">
-            {unreadCount > 0 ? `${unreadCount} non lue(s).` : 'Tout est à jour.'}
+            {unreadCount > 0 ? `${unreadCount} ${t('notifications.unread')}` : t('notifications.all_up_to_date')}
           </p>
         </div>
         <Button
@@ -74,15 +76,15 @@ export default function NotificationsClient() {
           disabled={unreadCount === 0 || markAllRead.isPending}
           onClick={() => markAllRead.mutate()}
         >
-          Tout marquer comme lu
+          {t('notifications.mark_all_as_read')}
         </Button>
       </div>
 
       <div className="mt-6 space-y-3">
         {notificationsQuery.isLoading ? (
-          <div className="text-sm text-[#9fadbc]">Chargement…</div>
+          <div className="text-sm text-[#9fadbc]">{t('notifications.loading')}</div>
         ) : notifications.length === 0 ? (
-          <div className="text-sm text-[#9fadbc]">Aucune notification pour le moment.</div>
+          <div className="text-sm text-[#9fadbc]">{t('notifications.no_notifications')}</div>
         ) : (
           notifications.map((n) => {
             const isUnread = !n.readAt;
@@ -109,12 +111,12 @@ export default function NotificationsClient() {
                         className="text-[#9fadbc] hover:bg-[#a6c5e229]"
                         onClick={() => markRead.mutate({ id: n.id })}
                       >
-                        Marquer comme lu
+                        {t('notifications.mark_as_read')}
                       </Button>
                     ) : null}
                     {href ? (
                       <Button variant="trello" size="sm" onClick={() => openNotification(n)}>
-                        Ouvrir
+                        {t('notifications.open')}
                       </Button>
                     ) : null}
                   </div>
@@ -133,7 +135,7 @@ export default function NotificationsClient() {
             disabled={notificationsQuery.isFetchingNextPage}
             onClick={() => notificationsQuery.fetchNextPage()}
           >
-            Voir plus
+            {t('notifications.see_more')}
           </Button>
         </div>
       ) : null}

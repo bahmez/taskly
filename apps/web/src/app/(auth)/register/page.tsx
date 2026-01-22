@@ -5,27 +5,34 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, Input, useToast } from '@taskly/ui';
 import { useAuth } from '@/auth/auth-provider';
+import { useTranslation } from '@/lib/i18n';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, registerWithEmailPassword } = useAuth();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (!loading && user) router.replace('/dashboard');
   }, [loading, user, router]);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== password2) {
       toast({
-        title: 'Mot de passe',
-        description: 'Les mots de passe ne correspondent pas.',
+        title: t('auth.password_label'),
+        description: t('toast.password_mismatch'),
         variant: 'destructive',
       });
       return;
@@ -37,8 +44,8 @@ export default function RegisterPage() {
       router.replace('/dashboard');
     } catch (err) {
       toast({
-        title: 'Inscription impossible',
-        description: err instanceof Error ? err.message : 'Une erreur est survenue.',
+        title: t('toast.registration_failed'),
+        description: err instanceof Error ? err.message : t('auth.error_default'),
         variant: 'destructive',
       });
     } finally {
@@ -46,17 +53,19 @@ export default function RegisterPage() {
     }
   }
 
+  if (!mounted) return null;
+
   return (
     <Card className="w-full max-w-md shadow-xl border-[#9fadbc29] bg-[#1d2125] text-[#b6c2cf]">
       <CardHeader>
-        <CardTitle className="text-[#b6c2cf]">Créer un compte</CardTitle>
-        <CardDescription className="text-[#9fadbc]">Inscris-toi avec ton email et un mot de passe.</CardDescription>
+        <CardTitle className="text-[#b6c2cf]">{t('auth.register_title')}</CardTitle>
+        <CardDescription className="text-[#9fadbc]">{t('auth.register_description')}</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm text-[#9fadbc]" htmlFor="email">
-              Email
+              {t('auth.email_label')}
             </label>
             <Input
               id="email"
@@ -64,7 +73,7 @@ export default function RegisterPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('auth.email_placeholder')}
               className="bg-[#22272b] border-[#9fadbc29] text-[#b6c2cf] placeholder:text-[#9fadbc]"
               required
             />
@@ -72,7 +81,7 @@ export default function RegisterPage() {
 
           <div className="space-y-2">
             <label className="text-sm text-[#9fadbc]" htmlFor="password">
-              Mot de passe
+              {t('auth.password_label')}
             </label>
             <Input
               id="password"
@@ -87,7 +96,7 @@ export default function RegisterPage() {
 
           <div className="space-y-2">
             <label className="text-sm text-[#9fadbc]" htmlFor="password2">
-              Confirmer le mot de passe
+              {t('auth.password_confirm_label')}
             </label>
             <Input
               id="password2"
@@ -103,12 +112,12 @@ export default function RegisterPage() {
 
         <CardFooter className="flex flex-col gap-3 items-stretch">
           <Button type="submit" variant="trello" disabled={submitting}>
-            {submitting ? 'Création…' : 'Créer mon compte'}
+            {submitting ? t('auth.sign_up_loading') : t('auth.sign_up')}
           </Button>
           <p className="text-sm text-[#9fadbc]">
-            Déjà un compte ?{' '}
+            {t('auth.have_account')}{' '}
             <Link className="text-[#85b8ff] hover:underline" href="/login">
-              Se connecter
+              {t('auth.login_link')}
             </Link>
           </p>
         </CardFooter>
@@ -116,5 +125,3 @@ export default function RegisterPage() {
     </Card>
   );
 }
-
-

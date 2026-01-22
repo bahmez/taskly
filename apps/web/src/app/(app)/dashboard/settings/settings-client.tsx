@@ -4,6 +4,7 @@ import React from 'react';
 import { api } from '@/app/trpc';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
 import { Button, Card, CardContent, Input, Textarea, useToast } from '@taskly/ui';
+import { useTranslation } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 
 function trpcErrorMessage(err: unknown): string {
@@ -12,6 +13,7 @@ function trpcErrorMessage(err: unknown): string {
 }
 
 export default function SettingsClient() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const router = useRouter();
   const utils = api.useUtils();
@@ -28,19 +30,19 @@ export default function SettingsClient() {
     onSuccess: async (ws) => {
       await utils.workspaces.byId.invalidate({ workspaceId: ws.id });
       await utils.workspaces.list.invalidate();
-      toast({ title: 'Workspace updated' });
+      toast({ title: t('toast.workspace_updated') });
     },
-    onError: (e) => toast({ title: 'Cannot update', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.cannot_update'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const archiveWs = api.workspaces.remove.useMutation({
     onSuccess: async () => {
       await utils.workspaces.list.invalidate();
       setSelectedWorkspaceId(null);
-      toast({ title: 'Workspace archived' });
+      toast({ title: t('toast.workspace_archived') });
       router.push('/dashboard');
     },
-    onError: (e) => toast({ title: 'Cannot archive', description: trpcErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: t('toast.cannot_archive'), description: trpcErrorMessage(e), variant: 'destructive' }),
   });
 
   const [title, setTitle] = React.useState('');
@@ -55,8 +57,8 @@ export default function SettingsClient() {
   if (!workspaceId) {
     return (
       <div className="p-6 text-[#b6c2cf]">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="mt-2 text-[#9fadbc]">Sélectionne un workspace pour modifier ses paramètres.</p>
+        <h1 className="text-2xl font-semibold">{t('settings.page_title')}</h1>
+        <p className="mt-2 text-[#9fadbc]">{t('settings.select_workspace')}</p>
       </div>
     );
   }
@@ -64,7 +66,7 @@ export default function SettingsClient() {
   return (
     <div className="p-6 text-[#b6c2cf]">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold truncate">Settings</h1>
+        <h1 className="text-2xl font-semibold truncate">{t('settings.page_title')}</h1>
         <p className="mt-2 text-[#9fadbc]">
           Workspace: <span className="text-[#b6c2cf]">{wsQuery.data?.title ?? workspaceId}</span>
         </p>
@@ -73,14 +75,14 @@ export default function SettingsClient() {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
           <CardContent className="p-5 space-y-3">
-            <div className="text-sm font-semibold">Workspace profile</div>
+            <div className="text-sm font-semibold">{t('settings.workspace_profile')}</div>
             <div className="space-y-2">
-              <div className="text-xs text-[#9fadbc]">Title</div>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Workspace title" />
+              <div className="text-xs text-[#9fadbc]">{t('settings.title_label')}</div>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('settings.workspace_title_placeholder')} />
             </div>
             <div className="space-y-2">
-              <div className="text-xs text-[#9fadbc]">Description</div>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
+              <div className="text-xs text-[#9fadbc]">{t('settings.description_label')}</div>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('settings.description_placeholder')} />
             </div>
             <div className="flex items-center gap-2 pt-2">
               <Button
@@ -88,7 +90,7 @@ export default function SettingsClient() {
                 disabled={!title.trim() || updateWs.isPending}
                 onClick={() => updateWs.mutate({ workspaceId, title: title.trim(), description })}
               >
-                Save
+                {t('actions.save')}
               </Button>
               <Button
                 variant="ghost"
@@ -99,7 +101,7 @@ export default function SettingsClient() {
                   setDescription(wsQuery.data.description ?? '');
                 }}
               >
-                Reset
+                {t('settings.reset_button')}
               </Button>
             </div>
           </CardContent>
@@ -107,19 +109,19 @@ export default function SettingsClient() {
 
         <Card className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
           <CardContent className="p-5 space-y-3">
-            <div className="text-sm font-semibold">Danger zone</div>
+            <div className="text-sm font-semibold">{t('settings.danger_zone')}</div>
             <p className="text-sm text-[#9fadbc]">
-              Archiver un workspace le rend inaccessible (les données restent dans la base mais il n’apparaît plus).
+              {t('settings.archive_description')}
             </p>
             <Button
               variant="destructive"
               disabled={archiveWs.isPending}
               onClick={() => {
-                if (!confirm('Archive this workspace?')) return;
+                if (!confirm(t('settings.archive_confirm'))) return;
                 archiveWs.mutate({ workspaceId });
               }}
             >
-              Archive workspace
+              {t('settings.archive_button')}
             </Button>
           </CardContent>
         </Card>
@@ -127,5 +129,3 @@ export default function SettingsClient() {
     </div>
   );
 }
-
-
