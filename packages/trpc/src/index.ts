@@ -769,6 +769,67 @@ export const appRouter = router({
       const text = input?.text ?? 'monorepo';
       return { message: `Bonjour ${text} — tRPC OK` };
     }),
+  search: router({
+    all: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().min(1).max(200),
+          limit: z.number().int().min(1).max(50).default(20),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        const query = input.query.toLowerCase().trim();
+        const limit = input.limit;
+        
+        // Get all workspaces for the user
+        const workspaces = await ctx.workspaces.listWorkspacesForUser(ctx.user!.id);
+        
+        // Filter workspaces by query
+        const matchingWorkspaces = workspaces
+          .filter((ws) => {
+            const titleMatch = ws.title.toLowerCase().includes(query);
+            const descMatch = ws.description?.toLowerCase().includes(query) ?? false;
+            return titleMatch || descMatch;
+          })
+          .slice(0, limit);
+        
+        // Get all boards from user's workspaces
+        const boardsByWorkspace = await Promise.all(
+          workspaces.map(async (ws) => {
+            const boards = await ctx.boards.listBoardsForWorkspace(ws.id);
+            return boards.map((board) => ({ ...board, workspace: ws }));
+          }),
+        );
+        
+        const allBoards = boardsByWorkspace.flat();
+        
+        // Filter boards by query
+        const matchingBoards = allBoards
+          .filter((board) => {
+            const titleMatch = board.title.toLowerCase().includes(query);
+            const descMatch = board.description?.toLowerCase().includes(query) ?? false;
+            return titleMatch || descMatch;
+          })
+          .slice(0, limit);
+        
+        return {
+          workspaces: matchingWorkspaces.map((ws) => ({
+            id: ws.id,
+            title: ws.title,
+            description: ws.description,
+            type: 'workspace' as const,
+          })),
+          boards: matchingBoards.map((board) => ({
+            id: board.id,
+            title: board.title,
+            description: board.description,
+            workspaceId: board.workspaceId,
+            workspaceTitle: board.workspace.title,
+            type: 'board' as const,
+          })),
+        };
+      }),
+  }),
   notifications: router({
     list: protectedProcedure
       .input(

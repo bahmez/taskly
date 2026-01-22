@@ -48,6 +48,7 @@ import { UserAvatar } from "@/components/user/user-avatar"
 import { getBoardBackgroundStyle } from "@/components/board/board-background"
 import { LanguageSwitcherDark } from "@/components/language-switcher"
 import { useTranslation } from "@/lib/i18n"
+import { SearchDialog } from "@/components/layout/search-dialog"
 
 /**
  * Formats notification timestamp for display.
@@ -125,6 +126,7 @@ export function Navbar() {
   const [avatarOpen, setAvatarOpen] = React.useState(false)
   const [avatarTab, setAvatarTab] = React.useState<"color" | "gradient" | "image" | "upload">("color")
   const [avatarSearch, setAvatarSearch] = React.useState("")
+  const [searchOpen, setSearchOpen] = React.useState(false)
 
   const avatarSearchValue = avatarSearch.trim()
   const avatarBackgroundsQuery = api.boards.listBackgrounds.useInfiniteQuery(
@@ -248,7 +250,7 @@ export function Navbar() {
         })
       }
     },
-    [createAvatarUpload, completeAvatarUpload, toast, setAvatarOpen],
+    [createAvatarUpload, completeAvatarUpload, toast, setAvatarOpen, t],
   )
 
   return (
@@ -382,13 +384,18 @@ export function Navbar() {
 
       {/* Right Section */}
       <div className="flex items-center gap-1">
-        <div className="relative hidden sm:block mr-1">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9fadbc]" />
-          <Input
-            placeholder={t('navbar.search_placeholder')}
-            className="h-8 w-56 bg-[#22272b] border-[#9fadbc29] pl-8 text-[#9fadbc] placeholder:text-[#9fadbc] hover:bg-[#2c333a] focus:bg-white focus:text-black focus:placeholder:text-gray-500 transition-all"
-          />
-        </div>
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="relative hidden sm:flex items-center h-8 w-56 bg-[#22272b] border border-[#9fadbc29] rounded-md px-3 mr-1 hover:bg-[#2c333a] transition-colors group"
+        >
+          <Search className="h-4 w-4 text-[#9fadbc] mr-2" />
+          <span className="text-sm text-[#9fadbc] flex-1 text-left">{t('navbar.search_placeholder')}</span>
+          <kbd className="hidden md:inline-flex h-5 px-1.5 items-center gap-1 rounded border border-[#9fadbc29] bg-[#1d2125] text-[10px] font-medium text-[#9fadbc]">
+            <span>⌘</span>K
+          </kbd>
+        </button>
+        
+        <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
 
         <LanguageSwitcherDark />
 
