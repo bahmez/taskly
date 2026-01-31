@@ -181,17 +181,6 @@
     "no_board": "No board. Create the first one.",
     "open_board": "Open →"
   },
-  "members": {
-    "select_workspace": "Select a workspace to manage its members.",
-    "impossible": "Impossible",
-    "cannot_remove_last_admin": "You cannot remove the last admin.",
-    "cannot_delete_last_member": "You cannot delete the last member of the workspace.",
-    "cannot_delete_last_admin": "You cannot delete the last admin."
-  },
-  "settings": {
-    "select_workspace": "Select a workspace to modify its settings.",
-    "archive_description": "Archiving a workspace makes it inaccessible (the data remains in the database but it no longer appears)."
-  },
   "notifications": {
     "unread": "unread.",
     "all_up_to_date": "Everything is up to date.",
@@ -360,6 +349,11 @@
     "set_due_date_for_presets": "Set a due date to use presets."
   },
   "members": {
+    "select_workspace": "Select a workspace to manage its members.",
+    "impossible": "Impossible",
+    "cannot_remove_last_admin": "You cannot remove the last admin. This is a deliberate limitation.",
+    "cannot_delete_last_member": "You cannot delete the last member of the workspace.",
+    "cannot_delete_last_admin": "You cannot delete the last admin. This is a deliberate limitation.",
     "page_title": "Members",
     "members_count": "Members ({{count}})",
     "loading": "Loading…",
@@ -396,6 +390,8 @@
     "role_updated_msg": "Role updated"
   },
   "settings": {
+    "select_workspace": "Select a workspace to modify its settings.",
+    "archive_description": "Archiving a workspace makes it inaccessible (the data remains in the database but it no longer appears).",
     "page_title": "Settings",
     "workspace_profile": "Workspace profile",
     "title_label": "Title",
