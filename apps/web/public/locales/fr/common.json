@@ -181,17 +181,6 @@
     "no_board": "Aucun board. Crée le premier.",
     "open_board": "Ouvrir →"
   },
-  "members": {
-    "select_workspace": "Sélectionne un workspace pour gérer ses membres.",
-    "impossible": "Impossible",
-    "cannot_remove_last_admin": "Tu ne peux pas retirer le dernier admin.",
-    "cannot_delete_last_member": "Tu ne peux pas supprimer le dernier membre du workspace.",
-    "cannot_delete_last_admin": "Tu ne peux pas supprimer le dernier admin."
-  },
-  "settings": {
-    "select_workspace": "Sélectionne un workspace pour modifier ses paramètres.",
-    "archive_description": "Archiver un workspace le rend inaccessible (les données restent dans la base mais il n'apparaît plus)."
-  },
   "notifications": {
     "unread": "non lue(s).",
     "all_up_to_date": "Tout est à jour.",
@@ -360,6 +349,11 @@
     "set_due_date_for_presets": "Définir une date d'échéance pour utiliser les présets."
   },
   "members": {
+    "select_workspace": "Sélectionne un workspace pour gérer ses membres.",
+    "impossible": "Impossible",
+    "cannot_remove_last_admin": "Tu ne peux pas retirer le dernier admin. C'est une limitation volontaire.",
+    "cannot_delete_last_member": "Tu ne peux pas supprimer le dernier membre du workspace.",
+    "cannot_delete_last_admin": "Tu ne peux pas supprimer le dernier admin. C'est une limitation volontaire.",
     "page_title": "Membres",
     "members_count": "Membres ({{count}})",
     "loading": "Chargement…",
@@ -396,6 +390,8 @@
     "role_updated_msg": "Rôle mis à jour"
   },
   "settings": {
+    "select_workspace": "Sélectionne un workspace pour modifier ses paramètres.",
+    "archive_description": "Archiver un workspace le rend inaccessible (les données restent dans la base mais il n'apparaît plus).",
     "page_title": "Paramètres",
     "workspace_profile": "Profil du workspace",
     "title_label": "Titre",
