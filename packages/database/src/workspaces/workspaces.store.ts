@@ -38,6 +38,15 @@ export class WorkspacesStore {
     return this.workspaceRef(workspaceId).collection('invitations');
   }
 
+  private getProjectIdForConsole(): string {
+    return (
+      process.env.FIREBASE_PROJECT_ID ??
+      process.env.GCLOUD_PROJECT ??
+      process.env.GCP_PROJECT ??
+      '<PROJECT_ID>'
+    );
+  }
+
   async createWorkspace(
     input: WorkspaceCreateInput,
   ): Promise<WorkspaceModel> {
@@ -295,7 +304,7 @@ export class WorkspacesStore {
       const err = e as { code?: number | string; message?: string };
       const code = typeof err?.code === 'string' ? Number(err.code) : err?.code;
       if (code === 9) {
-        const projectId = (this.db as any)?.projectId ?? (this.db as any)?._projectId ?? '<PROJECT_ID>';
+        const projectId = this.getProjectIdForConsole();
         console.error(
           `[Firestore] Missing collection group index for 'invitations'. Create it here:\n` +
           `https://console.firebase.google.com/v1/r/project/${projectId}/firestore/indexes?create_exemption=ClBwcm9qZWN0cy8ke3Byb2plY3RJZH0vZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2ludml0YXRpb25zL2ZpZWxkcy90b2tlbhACGggKBHRva2Vu\n\n` +
@@ -355,7 +364,7 @@ export class WorkspacesStore {
       const err = e as { code?: number | string; message?: string };
       const code = typeof err?.code === 'string' ? Number(err.code) : err?.code;
       if (code === 9) {
-        const projectId = (this.db as any)?.projectId ?? (this.db as any)?._projectId ?? '<PROJECT_ID>';
+        const projectId = this.getProjectIdForConsole();
         console.error(
           `[Firestore] Missing collection group index for 'invitations'. Create it here:\n` +
           `https://console.firebase.google.com/v1/r/project/${projectId}/firestore/indexes?create_exemption=ClBwcm9qZWN0cy8ke3Byb2plY3RJZH0vZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2ludml0YXRpb25zL2ZpZWxkcy90b2tlbhACGggKBHRva2Vu\n\n` +
