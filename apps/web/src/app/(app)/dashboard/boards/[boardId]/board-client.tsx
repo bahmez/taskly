@@ -39,7 +39,7 @@ import {
 } from '@taskly/ui';
 import { useWorkspaceUI } from '@/components/workspace/workspace-ui-provider';
 import { UserAvatar } from '@/components/user/user-avatar';
-import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar, ScrollText, Clock, Paintbrush } from 'lucide-react';
+import { MoreHorizontal, Plus, CheckSquare, Paperclip, MessageSquare, GripVertical, Calendar, ScrollText, Clock, Paintbrush, Bell } from 'lucide-react';
 import TicketDialogV2 from '@/components/ticket/ticket-dialog-v2';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -174,6 +174,7 @@ function SortableBoardTicket({
   formatUserSecondary: _formatUserSecondary,
   initialsForUser: _initialsForUser,
   userById,
+  notifCount,
 }: {
   t: TicketLike;
   labelMap: Map<string, AnyLabel>;
@@ -182,6 +183,7 @@ function SortableBoardTicket({
   formatUserSecondary: (userId: string) => string;
   initialsForUser: (userId: string) => string;
   userById: Map<string, { id: string }>;
+  notifCount: number;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: dndTicketId(t.id),
@@ -285,6 +287,12 @@ function SortableBoardTicket({
               <span>0</span>
             </div>
           )}
+          {notifCount > 0 && (
+            <div className="flex items-center gap-1 text-xs text-[#579dff] font-medium">
+              <Bell className="h-3 w-3" />
+              <span>{notifCount}</span>
+            </div>
+          )}
           {/* Assignees */}
           {t.assigneeIds && t.assigneeIds.length > 0 && (
             <div className="flex -space-x-1 ml-auto">
@@ -339,6 +347,7 @@ function SortableBoardColumn({
   formatUserSecondary,
   initialsForUser,
   userById,
+  ticketNotifCounts,
 }: {
   boardId: string;
   col: ColumnLike;
@@ -370,6 +379,7 @@ function SortableBoardColumn({
   formatUserSecondary: (userId: string) => string;
   initialsForUser: (userId: string) => string;
   userById: Map<string, { id: string }>;
+  ticketNotifCounts: Map<string, number>;
 }) {
   const { t } = useTranslation();
   const { setNodeRef: setDropRef } = useDroppable({
@@ -486,6 +496,7 @@ function SortableBoardColumn({
               formatUserSecondary={formatUserSecondary}
               initialsForUser={initialsForUser}
               userById={userById}
+              notifCount={ticketNotifCounts.get(ticket.id) ?? 0}
             />
           ))}
         </SortableContext>
@@ -533,6 +544,35 @@ export default function BoardClient({ boardId }: { boardId: string }) {
     { boardId, limit: 30, cursor: null, includeTickets: true },
     { enabled: boardActivityOpen },
   );
+
+  // Fetch unread notifications to display per-ticket badge counts
+  const unreadNotifsQuery = api.notifications.list.useQuery(
+    { limit: 50, unreadOnly: true },
+    { refetchInterval: 15_000 },
+  );
+
+  const { ticketNotifCounts, ticketNotifIds } = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    const ids = new Map<string, string[]>();
+    const items = unreadNotifsQuery.data?.items ?? [];
+    for (const n of items) {
+      const nBoardId = typeof n.data?.boardId === 'string' ? n.data.boardId : null;
+      const nTicketId = typeof n.data?.ticketId === 'string' ? n.data.ticketId : null;
+      if (nBoardId !== boardId || !nTicketId) continue;
+      counts.set(nTicketId, (counts.get(nTicketId) ?? 0) + 1);
+      const arr = ids.get(nTicketId) ?? [];
+      arr.push(n.id);
+      ids.set(nTicketId, arr);
+    }
+    return { ticketNotifCounts: counts, ticketNotifIds: ids };
+  }, [unreadNotifsQuery.data, boardId]);
+
+  const markRead = api.notifications.markRead.useMutation({
+    onSuccess: async () => {
+      await utils.notifications.list.invalidate();
+      await utils.notifications.unreadCount.invalidate();
+    },
+  });
 
   const [backgroundPickerOpen, setBackgroundPickerOpen] = React.useState(false);
   const [backgroundTab, setBackgroundTab] = React.useState<'color' | 'gradient' | 'image'>('color');
@@ -1068,6 +1108,10 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                                   onClick={() => {
                                     setBoardActivityOpen(false);
                                     setOpenedTicketId(it.ticketId!);
+                                    const ids = ticketNotifIds.get(it.ticketId!);
+                                    if (ids?.length) {
+                                      for (const id of ids) markRead.mutate({ id });
+                                    }
                                   }}
                                 >
                                   {t('board.open_ticket')}
@@ -1185,11 +1229,19 @@ export default function BoardClient({ boardId }: { boardId: string }) {
                       setNewCardDescByColumn((s) => ({ ...s, [col.id]: '' }));
                     }}
                     labelMap={labelMap}
-                    onOpenTicket={(ticketId) => setOpenedTicketId(ticketId)}
+                    onOpenTicket={(ticketId) => {
+                      setOpenedTicketId(ticketId);
+                      // Mark related notifications as read
+                      const ids = ticketNotifIds.get(ticketId);
+                      if (ids?.length) {
+                        for (const id of ids) markRead.mutate({ id });
+                      }
+                    }}
                     formatUserPrimary={formatUserPrimary}
                     formatUserSecondary={formatUserSecondary}
                     initialsForUser={initialsForUser}
                     userById={usersById}
+                    ticketNotifCounts={ticketNotifCounts}
                   />
                 );
               })}
