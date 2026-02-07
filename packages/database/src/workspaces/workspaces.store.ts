@@ -284,11 +284,29 @@ export class WorkspacesStore {
 
   async acceptInvitationByToken(token: string, userId: string): Promise<WorkspaceInvitationModel> {
     // Find invitation doc reference via collectionGroup, then tx update + upsert member
-    const snap = await this.db
-      .collectionGroup('invitations')
-      .where('token', '==', token)
-      .limit(1)
-      .get();
+    let snap: FirebaseFirestore.QuerySnapshot;
+    try {
+      snap = await this.db
+        .collectionGroup('invitations')
+        .where('token', '==', token)
+        .limit(1)
+        .get();
+    } catch (e) {
+      const err = e as { code?: number | string; message?: string };
+      const code = typeof err?.code === 'string' ? Number(err.code) : err?.code;
+      if (code === 9) {
+        const projectId = (this.db as any)?.projectId ?? (this.db as any)?._projectId ?? '<PROJECT_ID>';
+        console.error(
+          `[Firestore] Missing collection group index for 'invitations'. Create it here:\n` +
+          `https://console.firebase.google.com/v1/r/project/${projectId}/firestore/indexes?create_exemption=ClBwcm9qZWN0cy8ke3Byb2plY3RJZH0vZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2ludml0YXRpb25zL2ZpZWxkcy90b2tlbhACGggKBHRva2Vu\n\n` +
+          `Or manually: Go to Firebase Console > Firestore > Indexes > Collection Group > Add index:\n` +
+          `  Collection group: invitations\n` +
+          `  Field: token (Ascending)\n` +
+          `  Query scope: Collection group`,
+        );
+      }
+      throw e;
+    }
     if (snap.empty) throw new Error('Invitation not found');
     const invDoc = snap.docs[0]!;
     const workspaceRef = invDoc.ref.parent.parent;
@@ -300,7 +318,10 @@ export class WorkspacesStore {
     const now = nowIso();
 
     await this.db.runTransaction(async (tx) => {
+      // All reads MUST happen before any write in a Firestore transaction
       const invSnap = await tx.get(invRef);
+      const memSnap = await tx.get(memberRef);
+
       const inv = invSnap.data() as InvitationDoc;
       if (!inv) throw new Error('Invitation not found');
       if (inv.cancelledAt) throw new Error('Invitation cancelled');
@@ -310,7 +331,6 @@ export class WorkspacesStore {
 
       tx.update(invRef, { acceptedAt: now, acceptedBy: userId } satisfies Partial<InvitationDoc>);
 
-      const memSnap = await tx.get(memberRef);
       if (memSnap.exists) {
         tx.update(memberRef, { role: inv.role, updatedAt: now } satisfies Partial<MemberDoc>);
       } else {
@@ -324,11 +344,29 @@ export class WorkspacesStore {
   }
 
   async declineInvitationByToken(token: string, userId: string): Promise<WorkspaceInvitationModel> {
-    const snap = await this.db
-      .collectionGroup('invitations')
-      .where('token', '==', token)
-      .limit(1)
-      .get();
+    let snap: FirebaseFirestore.QuerySnapshot;
+    try {
+      snap = await this.db
+        .collectionGroup('invitations')
+        .where('token', '==', token)
+        .limit(1)
+        .get();
+    } catch (e) {
+      const err = e as { code?: number | string; message?: string };
+      const code = typeof err?.code === 'string' ? Number(err.code) : err?.code;
+      if (code === 9) {
+        const projectId = (this.db as any)?.projectId ?? (this.db as any)?._projectId ?? '<PROJECT_ID>';
+        console.error(
+          `[Firestore] Missing collection group index for 'invitations'. Create it here:\n` +
+          `https://console.firebase.google.com/v1/r/project/${projectId}/firestore/indexes?create_exemption=ClBwcm9qZWN0cy8ke3Byb2plY3RJZH0vZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2ludml0YXRpb25zL2ZpZWxkcy90b2tlbhACGggKBHRva2Vu\n\n` +
+          `Or manually: Go to Firebase Console > Firestore > Indexes > Collection Group > Add index:\n` +
+          `  Collection group: invitations\n` +
+          `  Field: token (Ascending)\n` +
+          `  Query scope: Collection group`,
+        );
+      }
+      throw e;
+    }
     if (snap.empty) throw new Error('Invitation not found');
     const invDoc = snap.docs[0]!;
     const workspaceRef = invDoc.ref.parent.parent;
