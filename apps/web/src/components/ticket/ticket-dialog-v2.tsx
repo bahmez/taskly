@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import React from 'react';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
@@ -43,7 +45,6 @@ import {
   findActiveMention,
   insertMention,
   type MentionableUser,
-  parseMentionTokens,
   mentionMatchFromToken,
   findMentionTokenAtCursor,
 } from '../ui/mention-autocomplete';
