@@ -285,21 +285,21 @@ export function Navbar() {
   )
 
   return (
-    <Header className="h-12 bg-[#1d2125] border-b border-[#9fadbc29] px-4 flex items-center justify-between backdrop-blur-none supports-[backdrop-filter]:bg-[#1d2125]">
+    <Header className="h-12 bg-[#1d2125] border-b border-[#9fadbc29] px-2 sm:px-4 flex items-center justify-between backdrop-blur-none supports-[backdrop-filter]:bg-[#1d2125] overflow-hidden">
       {/* Left Section */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 min-w-0 shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc]"
+          className="h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] shrink-0"
         >
           <Grid className="h-4 w-4" />
         </Button>
 
-        <Link href="/dashboard" className="flex items-center gap-2 px-2 group">
+        <Link href="/dashboard" className="flex items-center gap-2 px-2 group shrink-0">
           <div className="flex gap-1 items-center font-bold text-[#9fadbc] group-hover:text-white transition-colors text-lg tracking-tight">
             <div className="h-5 w-5 bg-[#0055cc] rounded-[2px]" />
-            Taskly
+            <span className="hidden sm:inline">Taskly</span>
           </div>
         </Link>
 
@@ -414,21 +414,32 @@ export function Navbar() {
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Search: icon-only on sm, full bar on md+ */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] sm:hidden shrink-0"
+          onClick={() => setSearchOpen(true)}
+        >
+          <Search className="h-4 w-4" />
+        </Button>
         <button
           onClick={() => setSearchOpen(true)}
-          className="relative hidden sm:flex items-center h-8 w-56 bg-[#22272b] border border-[#9fadbc29] rounded-md px-3 mr-1 hover:bg-[#2c333a] transition-colors group"
+          className="relative hidden sm:flex items-center h-8 w-44 lg:w-56 bg-[#22272b] border border-[#9fadbc29] rounded-md px-3 mr-1 hover:bg-[#2c333a] transition-colors group shrink-0"
         >
           <Search className="h-4 w-4 text-[#9fadbc] mr-2" />
-          <span className="text-sm text-[#9fadbc] flex-1 text-left">{t('navbar.search_placeholder')}</span>
-          <kbd className="hidden md:inline-flex h-5 px-1.5 items-center gap-1 rounded border border-[#9fadbc29] bg-[#1d2125] text-[10px] font-medium text-[#9fadbc]">
+          <span className="text-sm text-[#9fadbc] flex-1 text-left truncate">{t('navbar.search_placeholder')}</span>
+          <kbd className="hidden lg:inline-flex h-5 px-1.5 items-center gap-1 rounded border border-[#9fadbc29] bg-[#1d2125] text-[10px] font-medium text-[#9fadbc]">
             <span>⌘</span>K
           </kbd>
         </button>
         
         <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
 
-        <LanguageSwitcherDark />
+        <div className="hidden md:block">
+          <LanguageSwitcherDark />
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -508,7 +519,7 @@ export function Navbar() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] rounded-full"
+          className="hidden sm:flex h-8 w-8 text-[#9fadbc] hover:bg-[#a6c5e229] hover:text-[#9fadbc] rounded-full"
         >
           <HelpCircle className="h-4 w-4" />
         </Button>

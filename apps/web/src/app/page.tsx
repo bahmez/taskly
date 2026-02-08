@@ -14,15 +14,33 @@
 
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@taskly/ui';
 import { useAuth } from '@/auth/auth-provider';
 import { useTranslation } from '@/lib/i18n';
 import { LanguageSwitcher } from '@/components/language-switcher';
 
+function BurgerIcon({ open }: { open: boolean }) {
+  return (
+    <div className="flex flex-col justify-center items-center w-6 h-6 gap-[5px]">
+      <span
+        className={`block h-[2px] w-5 rounded-full bg-slate-700 transition-all duration-300 ${open ? 'translate-y-[7px] rotate-45' : ''}`}
+      />
+      <span
+        className={`block h-[2px] w-5 rounded-full bg-slate-700 transition-all duration-300 ${open ? 'opacity-0' : ''}`}
+      />
+      <span
+        className={`block h-[2px] w-5 rounded-full bg-slate-700 transition-all duration-300 ${open ? '-translate-y-[7px] -rotate-45' : ''}`}
+      />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { user, loading, logout } = useAuth();
   const { t } = useTranslation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const showAuthButtons = !loading && !user;
   const showDashboardButtons = !loading && user;
 
@@ -34,38 +52,79 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-white via-white to-slate-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-20 px-6 py-10">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0c66e4] text-white font-semibold">
-              T
+        <header className="relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0c66e4] text-white font-semibold">
+                T
+              </div>
+              <span className="text-lg font-semibold text-slate-900">Taskly</span>
             </div>
-            <span className="text-lg font-semibold text-slate-900">Taskly</span>
+
+            {/* Desktop nav */}
+            <div className="hidden sm:flex items-center gap-3">
+              <LanguageSwitcher />
+              <div className="flex items-center gap-2">
+                {showAuthButtons && (
+                  <>
+                    <Button asChild variant="trelloGray" size="sm">
+                      <Link href="/login">{t('header.login_button')}</Link>
+                    </Button>
+                    <Button asChild variant="trello" size="sm">
+                      <Link href="/register">{t('header.register_button')}</Link>
+                    </Button>
+                  </>
+                )}
+                {showDashboardButtons && (
+                  <>
+                    <Button asChild variant="trello" size="sm">
+                      <Link href="/dashboard">{t('header.dashboard_button')}</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => logout()}>
+                      {t('header.logout_button')}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Burger button (mobile only) */}
+            <button
+              type="button"
+              className="sm:hidden flex items-center justify-center h-10 w-10 rounded-lg hover:bg-slate-100 transition-colors"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-label="Toggle menu"
+            >
+              <BurgerIcon open={mobileMenuOpen} />
+            </button>
           </div>
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-            <div className="flex items-center gap-2">
+
+          {/* Mobile menu */}
+          {mobileMenuOpen && (
+            <div className="sm:hidden mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <LanguageSwitcher />
               {showAuthButtons && (
-                <>
-                  <Button asChild variant="trelloGray">
-                    <Link href="/login">{t('header.login_button')}</Link>
+                <div className="flex flex-col gap-2">
+                  <Button asChild variant="trelloGray" className="w-full justify-center">
+                    <Link href="/login" onClick={() => setMobileMenuOpen(false)}>{t('header.login_button')}</Link>
                   </Button>
-                  <Button asChild variant="trello">
-                    <Link href="/register">{t('header.register_button')}</Link>
+                  <Button asChild variant="trello" className="w-full justify-center">
+                    <Link href="/register" onClick={() => setMobileMenuOpen(false)}>{t('header.register_button')}</Link>
                   </Button>
-                </>
+                </div>
               )}
               {showDashboardButtons && (
-                <>
-                  <Button asChild variant="trello">
-                    <Link href="/dashboard">{t('header.dashboard_button')}</Link>
+                <div className="flex flex-col gap-2">
+                  <Button asChild variant="trello" className="w-full justify-center">
+                    <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>{t('header.dashboard_button')}</Link>
                   </Button>
-                  <Button variant="outline" onClick={() => logout()}>
+                  <Button variant="outline" className="w-full justify-center" onClick={() => { logout(); setMobileMenuOpen(false); }}>
                     {t('header.logout_button')}
                   </Button>
-                </>
+                </div>
               )}
             </div>
-          </div>
+          )}
         </header>
 
         <section className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">

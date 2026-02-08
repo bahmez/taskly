@@ -60,15 +60,15 @@ function MemberRow({
   const cannotRemove = isLastMember || isLastAdmin;
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[#9fadbc29] p-3">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-md border border-[#9fadbc29] p-3">
       <div className="min-w-0">
         <div className="text-sm font-medium truncate">{label}</div>
         {secondary ? <div className="text-xs text-[#9fadbc] truncate">{secondary}</div> : null}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <Select value={member.role} onValueChange={(v) => onUpdateRole(member.userId, v as Role)}>
-          <SelectTrigger className="h-9 w-[140px] bg-[#22272b] border-[#9fadbc29] text-[#b6c2cf]">
+          <SelectTrigger className="h-9 w-[120px] sm:w-[140px] bg-[#22272b] border-[#9fadbc29] text-[#b6c2cf]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -82,6 +82,7 @@ function MemberRow({
 
         <Button
           variant="ghost"
+          size="sm"
           className="h-9 text-[#9fadbc] hover:bg-[#a6c5e229]"
           disabled={cannotRemove}
           onClick={() => {
@@ -203,19 +204,19 @@ export default function MembersClient() {
   }
 
   return (
-    <div className="p-6 text-[#b6c2cf]">
-      <div className="flex items-start justify-between gap-4">
+    <div className="p-4 sm:p-6 text-[#b6c2cf] overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold truncate">{t('members.page_title')}</h1>
-          <p className="mt-2 text-[#9fadbc]">
+          <h1 className="text-xl sm:text-2xl font-semibold truncate">{t('members.page_title')}</h1>
+          <p className="mt-1 sm:mt-2 text-[#9fadbc] text-sm">
             Workspace: <span className="text-[#b6c2cf]">{wsQuery.data?.title ?? workspaceId}</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
-              <Button variant="trelloGray">{t('members.add_member_btn')}</Button>
+              <Button variant="trelloGray" size="sm">{t('members.add_member_btn')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -283,7 +284,7 @@ export default function MembersClient() {
 
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
-              <Button variant="trello">{t('members.create_invite_btn')}</Button>
+              <Button variant="trello" size="sm">{t('members.create_invite_btn')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
