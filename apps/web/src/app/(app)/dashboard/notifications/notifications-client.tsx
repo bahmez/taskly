@@ -24,10 +24,11 @@ export default function NotificationsClient() {
     { limit: PAGE_SIZE },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
+      refetchInterval: 10_000,
     },
   );
 
-  const unreadCountQuery = api.notifications.unreadCount.useQuery();
+  const unreadCountQuery = api.notifications.unreadCount.useQuery(undefined, { refetchInterval: 10_000 });
 
   const markRead = api.notifications.markRead.useMutation({
     onSuccess: async () => {
