@@ -43,7 +43,7 @@ Taskly permet aux équipes d'organiser leur travail via :
 | **Younes Bahri** | Lead Developer | Architecture, Backend, DevOps, Coordination |
 | **Schekina Ahounou** | Developer | Frontend, Backend, Firebase, QA |
 
-**Établissement** : Épita  
+**Établissement** : Epitech 
 **Période** : Novembre 2025 - Janvier 2026  
 **Contexte** : Projet pédagogique de fin d'études
 
