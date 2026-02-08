@@ -141,8 +141,8 @@ export function Navbar() {
     },
   )
 
-  const notificationsQuery = api.notifications.list.useQuery({ limit: 6 })
-  const unreadCountQuery = api.notifications.unreadCount.useQuery()
+  const notificationsQuery = api.notifications.list.useQuery({ limit: 6 }, { refetchInterval: 10_000 })
+  const unreadCountQuery = api.notifications.unreadCount.useQuery(undefined, { refetchInterval: 10_000 })
   const markRead = api.notifications.markRead.useMutation({
     onSuccess: async () => {
       await utils.notifications.list.invalidate()
@@ -158,6 +158,37 @@ export function Navbar() {
 
   const notifications = notificationsQuery.data?.items ?? []
   const unreadCount = unreadCountQuery.data?.count ?? 0
+
+  // Track known notification IDs to detect new ones arriving via polling
+  const knownNotifIdsRef = React.useRef<Set<string> | null>(null)
+
+  React.useEffect(() => {
+    if (!notificationsQuery.data) return
+
+    const currentIds = new Set(notifications.map((n) => n.id))
+
+    // First load: just seed the ref, don't toast
+    if (knownNotifIdsRef.current === null) {
+      knownNotifIdsRef.current = currentIds
+      return
+    }
+
+    // Find notifications that weren't in the previous set
+    const newNotifs = notifications.filter((n) => !knownNotifIdsRef.current!.has(n.id) && !n.readAt)
+    knownNotifIdsRef.current = currentIds
+
+    for (const n of newNotifs) {
+      toast({
+        title: (
+          <span className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-[#579dff]" />
+            {n.title}
+          </span>
+        ) as unknown as string,
+        description: n.body ?? undefined,
+      })
+    }
+  }, [notificationsQuery.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const notificationHref = (n: (typeof notifications)[number]) => {
     const data = n.data ?? {}
