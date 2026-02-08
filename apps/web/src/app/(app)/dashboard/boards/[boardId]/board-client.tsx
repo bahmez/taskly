@@ -934,9 +934,9 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
   return (
     <div className="h-full flex flex-col" style={getBoardBackgroundStyle(board.background, { fallback: '#0b0f13' })}>
-      <div className="px-6 pt-5 pb-3 text-[#b6c2cf] flex items-center justify-between border-b border-[#9fadbc29] bg-[#0b0f13]/70 backdrop-blur-sm">
-        <div>
-          <div className="text-xl font-semibold">
+      <div className="px-3 sm:px-6 pt-3 sm:pt-5 pb-2 sm:pb-3 text-[#b6c2cf] flex flex-wrap items-center justify-between gap-2 border-b border-[#9fadbc29] bg-[#0b0f13]/70 backdrop-blur-sm">
+        <div className="min-w-0 flex-1">
+          <div className="text-lg sm:text-xl font-semibold truncate">
             {isEditingBoardTitle ? (
               <Input
                 autoFocus
@@ -965,7 +965,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
             ) : (
               <button
                 type="button"
-                className="hover:bg-[#a6c5e229] rounded px-2 py-1 -ml-2 transition-colors"
+                className="hover:bg-[#a6c5e229] rounded px-2 py-1 -ml-2 transition-colors truncate max-w-full text-left"
                 onClick={() => {
                   setBoardTitleDraft(board.title);
                   setIsEditingBoardTitle(true);
@@ -975,15 +975,15 @@ export default function BoardClient({ boardId }: { boardId: string }) {
               </button>
             )}
           </div>
-          {board.description ? <div className="text-sm text-[#9fadbc] mt-1">{board.description}</div> : null}
+          {board.description ? <div className="text-sm text-[#9fadbc] mt-1 truncate">{board.description}</div> : null}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           <Dialog open={backgroundPickerOpen} onOpenChange={setBackgroundPickerOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" className="gap-2" disabled={!canEditBackground}>
+              <Button variant="ghost" className="gap-2" disabled={!canEditBackground} size="sm">
                 <Paintbrush className="h-4 w-4" />
-                {t('board.background')}
+                <span className="hidden sm:inline">{t('board.background')}</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
@@ -1073,9 +1073,9 @@ export default function BoardClient({ boardId }: { boardId: string }) {
           </Dialog>
 
           <Dialog open={boardActivityOpen} onOpenChange={setBoardActivityOpen}>
-            <Button variant="ghost" className="gap-2" onClick={() => setBoardActivityOpen(true)}>
+            <Button variant="ghost" className="gap-2" onClick={() => setBoardActivityOpen(true)} size="sm">
               <ScrollText className="h-4 w-4" />
-              {t('board.board_activity')}
+              <span className="hidden sm:inline">{t('board.board_activity')}</span>
             </Button>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf] max-w-2xl">
               <DialogHeader>
@@ -1130,7 +1130,7 @@ export default function BoardClient({ boardId }: { boardId: string }) {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="trello">{t('board.add_column')}</Button>
+              <Button variant="trello" size="sm">{t('board.add_column')}</Button>
             </DialogTrigger>
             <DialogContent className="bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
               <DialogHeader>
