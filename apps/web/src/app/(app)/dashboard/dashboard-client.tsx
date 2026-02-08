@@ -190,20 +190,20 @@ export default function DashboardClient() {
   const pageWorkspaces = workspaces.slice(wsStart, wsStart + WORKSPACES_PER_PAGE);
 
   return (
-    <div className="p-6 text-[#b6c2cf]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="mt-2 text-[#9fadbc]">
+    <div className="p-4 sm:p-6 text-[#b6c2cf] overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold">Dashboard</h1>
+          <p className="mt-1 sm:mt-2 text-[#9fadbc] text-sm">
             {archivedView ? t('dashboard.archived_workspaces') : t('dashboard.all_workspaces')}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {!archivedView && (
             <Dialog>
             <DialogTrigger asChild>
-              <Button variant="trelloGray">{t('dashboard.create_board')}</Button>
+              <Button variant="trelloGray" size="sm">{t('dashboard.create_board')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -236,22 +236,23 @@ export default function DashboardClient() {
         {pageWorkspaces.map((ws) => {
           const page = boardsPagesByWorkspace[ws.id] ?? 1;
           return (
-            <section key={ws.id} className="rounded-xl border border-[#9fadbc29] bg-[#1d2125] p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-lg font-semibold text-[#b6c2cf] truncate">{ws.title}</div>
+            <section key={ws.id} className="rounded-xl border border-[#9fadbc29] bg-[#1d2125] p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-base sm:text-lg font-semibold text-[#b6c2cf] truncate">{ws.title}</div>
                   {ws.description ? <div className="text-sm text-[#9fadbc] mt-1 line-clamp-2">{ws.description}</div> : null}
                 </div>
                 {archivedView ? (
                   <Button
                     variant="trelloGray"
+                    size="sm"
                     disabled={unarchive.isPending}
                     onClick={() => unarchive.mutate({ workspaceId: ws.id })}
                   >
                     {t('dashboard.remove_from_archives')}
                   </Button>
                 ) : (
-                  <Button asChild variant="trelloGray">
+                  <Button asChild variant="trelloGray" size="sm">
                     <Link href={`/dashboard/workspaces/${ws.id}`}>{t('navbar.see_more')}</Link>
                   </Button>
                 )}

@@ -245,35 +245,100 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
   const markdownComponents = React.useMemo(() => {
     return {
+      // Links & mentions
       a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
         const h = href ?? '';
         if (h.startsWith('mention:')) {
-          // Children should already be "@username" from linkifyMentionsMarkdown
           return (
-            <span className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60 cursor-default no-underline" style={{ pointerEvents: 'none' }}>
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60 cursor-default no-underline text-xs font-medium" style={{ pointerEvents: 'none' }}>
               {children}
             </span>
           );
         }
-        // Back-compat: old stored mentions as markdown links (user:<id>)
         if (h.startsWith('user:')) {
           const userId = h.slice('user:'.length);
           const u = usersById.get(userId);
           const username = u?.username ?? userId;
-          // If children is already "@username" format, use it; otherwise prepend @
           const childText = typeof children === 'string' ? children : String(children ?? '');
           const label = childText.startsWith('@') ? childText : `@${username}`;
           return (
-            <span className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60 cursor-default no-underline" style={{ pointerEvents: 'none' }}>
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60 cursor-default no-underline text-xs font-medium" style={{ pointerEvents: 'none' }}>
               {label}
             </span>
           );
         }
         return (
-          <a href={h} className="underline hover:text-[#b6c2cf]" target="_blank" rel="noreferrer">
+          <a href={h} className="text-[#579dff] underline hover:text-[#85b8ff] break-all" target="_blank" rel="noreferrer">
             {children}
           </a>
         );
+      },
+      // Headings
+      h1: ({ children }: { children?: React.ReactNode }) => <h1 className="text-xl font-bold text-[#d2dce6] mt-6 mb-3 first:mt-0 border-b border-[#9fadbc29] pb-2">{children}</h1>,
+      h2: ({ children }: { children?: React.ReactNode }) => <h2 className="text-lg font-bold text-[#d2dce6] mt-5 mb-2 first:mt-0 border-b border-[#9fadbc29] pb-1.5">{children}</h2>,
+      h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-base font-semibold text-[#d2dce6] mt-4 mb-2 first:mt-0">{children}</h3>,
+      h4: ({ children }: { children?: React.ReactNode }) => <h4 className="text-sm font-semibold text-[#d2dce6] mt-3 mb-1 first:mt-0">{children}</h4>,
+      // Paragraphs
+      p: ({ children }: { children?: React.ReactNode }) => <p className="text-sm text-[#b6c2cf] leading-relaxed mb-3 last:mb-0">{children}</p>,
+      // Lists
+      ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside text-sm text-[#b6c2cf] space-y-1 mb-3 pl-2">{children}</ul>,
+      ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside text-sm text-[#b6c2cf] space-y-1 mb-3 pl-2">{children}</ol>,
+      li: ({ children }: { children?: React.ReactNode }) => <li className="text-sm text-[#b6c2cf] leading-relaxed">{children}</li>,
+      // Code
+      code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+        const isBlock = className?.startsWith('language-');
+        if (isBlock) {
+          return (
+            <code className={cn('block text-xs', className)}>
+              {children}
+            </code>
+          );
+        }
+        return (
+          <code className="bg-[#1d2125] text-[#f78166] px-1.5 py-0.5 rounded text-xs font-mono border border-[#9fadbc29]">
+            {children}
+          </code>
+        );
+      },
+      pre: ({ children }: { children?: React.ReactNode }) => (
+        <pre className="bg-[#1d2125] border border-[#9fadbc29] rounded-lg p-4 overflow-x-auto mb-3 text-xs font-mono text-[#b6c2cf] leading-relaxed">
+          {children}
+        </pre>
+      ),
+      // Blockquote
+      blockquote: ({ children }: { children?: React.ReactNode }) => (
+        <blockquote className="border-l-4 border-[#579dff] pl-4 py-1 my-3 text-[#9fadbc] italic bg-[#1d2125]/50 rounded-r-lg">
+          {children}
+        </blockquote>
+      ),
+      // Tables
+      table: ({ children }: { children?: React.ReactNode }) => (
+        <div className="overflow-x-auto mb-3 rounded-lg border border-[#9fadbc29]">
+          <table className="w-full text-sm text-left">{children}</table>
+        </div>
+      ),
+      thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-[#1d2125] text-[#9fadbc] text-xs uppercase">{children}</thead>,
+      tbody: ({ children }: { children?: React.ReactNode }) => <tbody className="divide-y divide-[#9fadbc29]">{children}</tbody>,
+      tr: ({ children }: { children?: React.ReactNode }) => <tr className="hover:bg-[#22272b]/50 transition-colors">{children}</tr>,
+      th: ({ children }: { children?: React.ReactNode }) => <th className="px-3 py-2 font-semibold text-[#b6c2cf] border-b border-[#9fadbc29]">{children}</th>,
+      td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2 text-[#b6c2cf]">{children}</td>,
+      // Horizontal rule
+      hr: () => <hr className="border-[#9fadbc29] my-4" />,
+      // Images
+      img: ({ src, alt }: { src?: string; alt?: string }) => (
+        <img src={src} alt={alt ?? ''} className="max-w-full h-auto rounded-lg border border-[#9fadbc29] my-3" loading="lazy" />
+      ),
+      // Strong & emphasis
+      strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-[#d2dce6]">{children}</strong>,
+      em: ({ children }: { children?: React.ReactNode }) => <em className="italic text-[#b6c2cf]">{children}</em>,
+      // Strikethrough (GFM)
+      del: ({ children }: { children?: React.ReactNode }) => <del className="line-through text-[#9fadbc]">{children}</del>,
+      // Task list items (GFM checkboxes)
+      input: ({ checked, type }: { checked?: boolean; type?: string }) => {
+        if (type === 'checkbox') {
+          return <input type="checkbox" checked={checked} readOnly className="mr-2 rounded accent-[#579dff]" />;
+        }
+        return <input type={type} />;
       },
     } as const;
   }, [usersById]);
@@ -329,37 +394,13 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   const [descMentionIndex, setDescMentionIndex] = React.useState(0);
 
   const renderCommentContent = React.useCallback((content: string) => {
-    // Parse @username mentions and render them as blue chips (not clickable)
-    const tokens = parseMentionTokens(content);
-    if (tokens.length === 0) {
-      // No mentions, just render as text (or with basic markdown if needed)
-      return <div className="whitespace-pre-wrap">{content}</div>;
-    }
-
-    const parts: React.ReactNode[] = [];
-    let cursor = 0;
-    for (let i = 0; i < tokens.length; i++) {
-      const t = tokens[i]!;
-      if (t.start > cursor) {
-        parts.push(<span key={`t-${i}`}>{content.slice(cursor, t.start)}</span>);
-      }
-      const mentionText = content.slice(t.start, t.end); // "@username"
-      parts.push(
-        <span
-          key={`m-${i}`}
-          className="inline-flex items-center rounded-full px-2 py-0.5 bg-[#0c66e4] text-white border border-[#0c66e4]/60"
-          style={{ pointerEvents: 'none' }}
-        >
-          {mentionText}
-        </span>,
-      );
-      cursor = t.end;
-    }
-    if (cursor < content.length) {
-      parts.push(<span key="tail">{content.slice(cursor)}</span>);
-    }
-    return <div className="whitespace-pre-wrap">{parts}</div>;
-  }, []);
+    // Render comments as markdown with mention support
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {linkifyMentionsMarkdown(content)}
+      </ReactMarkdown>
+    );
+  }, [markdownComponents]);
 
   const descMentionCandidates = React.useMemo(() => {
     if (!descMention) return [];
@@ -692,9 +733,9 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-hidden p-0 bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
+        <DialogContent className="max-w-4xl w-[95vw] sm:w-[90vw] max-h-[90vh] overflow-hidden p-0 bg-[#1d2125] border-[#9fadbc29] text-[#b6c2cf]">
           {/* Header */}
-          <div className="px-8 pt-8 pb-6 border-b border-[#9fadbc29]">
+          <div className="px-4 sm:px-8 pt-4 sm:pt-8 pb-4 sm:pb-6 border-b border-[#9fadbc29]">
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 shrink-0 flex items-start justify-start pt-2">
                 <FileText className="h-5 w-5 text-[#9fadbc]" />
@@ -736,9 +777,9 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
           </div>
 
           {/* Body: 2 colonnes */}
-          <div className="flex flex-col lg:flex-row gap-8 px-8 py-6 pb-8 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 160px)' }}>
+          <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 px-4 sm:px-8 py-4 sm:py-6 pb-6 sm:pb-8 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
             {/* Colonne principale */}
-            <div className="flex-1 space-y-8 min-w-0">
+            <div className="flex-1 space-y-6 sm:space-y-8 min-w-0">
               {/* Labels (si présents) */}
               {ticketLabelIds.length > 0 && (
                 <div>
@@ -1053,16 +1094,17 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
               {/* Comments / Activity */}
               <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <MessageSquare className="h-5 w-5 text-[#9fadbc]" />
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+                  <MessageSquare className="h-5 w-5 text-[#9fadbc] shrink-0" />
                   <h3 className="text-sm font-semibold text-[#b6c2cf]">
                     {ticketFeedView === 'history' ? t('ticket.activity_tab') : t('ticket.comments_tab')}
                   </h3>
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex items-center gap-1 sm:gap-2">
                     <Button
                       size="sm"
                       variant={ticketFeedView === 'comments' ? 'trello' : 'ghost'}
                       onClick={() => setTicketFeedView('comments')}
+                      className="text-xs sm:text-sm px-2 sm:px-3"
                     >
                       {t('ticket.comments_tab')}
                     </Button>
@@ -1070,6 +1112,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                       size="sm"
                       variant={ticketFeedView === 'history' ? 'trello' : 'ghost'}
                       onClick={() => setTicketFeedView('history')}
+                      className="text-xs sm:text-sm px-2 sm:px-3"
                     >
                       {t('ticket.history_tab')}
                     </Button>
@@ -1077,8 +1120,8 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 </div>
                 <div className="space-y-4">
                   {ticketFeedView === 'comments' && canComment && (
-                    <div className="flex gap-3">
-                      <UserAvatar user={meQuery.data ?? { username: 'You' }} className="h-9 w-9 shrink-0" />
+                    <div className="flex gap-2 sm:gap-3">
+                      <UserAvatar user={meQuery.data ?? { username: 'You' }} className="h-8 w-8 sm:h-9 sm:w-9 shrink-0" />
                       <div className="flex-1 space-y-3">
                         <Textarea
                           value={newComment}
@@ -1257,7 +1300,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
             </div>
 
             {/* Sidebar */}
-            <div className="w-full lg:w-56 shrink-0 space-y-6">
+            <div className="w-full lg:w-56 shrink-0 space-y-4 sm:space-y-6">
               {/* Due date */}
               <div>
                 <div className="text-xs font-semibold text-[#9fadbc] mb-3 uppercase tracking-wide">{t('ticket.due_date')}</div>
@@ -1668,11 +1711,11 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
 
             <div className="space-y-2">
               <div className="text-xs font-semibold text-[#9fadbc] uppercase tracking-wide">{t('ticket.presets')}</div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="flex-1"
+                  className="flex-1 min-w-[120px]"
                   disabled={!ticket.dueDate || createReminder.isPending}
                   onClick={() => {
                     if (!ticket.dueDate) return;
@@ -1687,7 +1730,7 @@ export default function TicketDialogV2({ open, onOpenChange, ticketId, boardId }
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="flex-1"
+                  className="flex-1 min-w-[120px]"
                   disabled={!ticket.dueDate || createReminder.isPending}
                   onClick={() => {
                     if (!ticket.dueDate) return;
